@@ -6,6 +6,10 @@ sibling Independence Run APIs, extended with a team/relay side those don't
 have: companies register a team with a captain login, and the captain later
 signs in to a dashboard to manage their roster.
 
+**Live:** `https://13-245-40-232.sslip.io` (AWS EC2, Elastic IP, HTTPS via
+Caddy/Let's Encrypt). Pushes to `main` auto-deploy there via
+`.github/workflows/deploy.yml`.
+
 ```
 kopalaicr-api/
 ├── backend/                   Django REST API
