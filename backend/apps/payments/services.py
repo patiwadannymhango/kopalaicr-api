@@ -107,6 +107,11 @@ def apply_payment_outcome(*, payment, provider_status, raw_response=None, respon
 
             target.confirm_payment()
 
+        # Outside the transaction — see BaseRegistration.confirm_payment's
+        # comment on why the notification send shouldn't happen while a DB
+        # transaction is still open.
+        target.notify_confirmed()
+
     elif provider_status in FAILED_STATES:
         payment.status = Payment.Status.FAILED
         payment.save(update_fields=["status", "updated_at"])

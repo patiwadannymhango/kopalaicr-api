@@ -285,5 +285,8 @@ class RosterRunner(UUIDModel):
         self.paid = True
         self.save(update_fields=["paid", "updated_at"])
 
+    def notify_confirmed(self):
+        pass  # no notification for an extra-runner fee payment — see the class docstring.
+
     def fail_payment(self, *, reason=""):
         pass  # stays paid=False; the captain just retries from the dashboard.

@@ -109,9 +109,13 @@ class BaseRegistration(UUIDModel):
         self.save(update_fields=["status", "updated_at"])
 
     def confirm_payment(self):
+        # Deliberately does NOT call notify_confirmed() itself —
+        # apps.payments.services.apply_payment_outcome calls it after the
+        # enclosing transaction commits, so a slow email/SMS send never
+        # holds a database transaction open (and can't roll back a
+        # successful payment if it errors).
         self.status = self.Status.CONFIRMED
         self.save(update_fields=["status", "updated_at"])
-        self.notify_confirmed()
 
     def fail_payment(self, *, reason=""):
         # Deliberately no status change — stays PENDING_PAYMENT/
