@@ -2,26 +2,20 @@
 # has a password or auth_token, RosterRunner is a plain roster entry
 # (no more covered/paid/amount/currency — that was only for the
 # now-removed self-service "add an extra runner and pay for it" flow),
-# and the "extra-runner" Category row (and is_extra_fee generally) go away
-# with it.
+# and Category loses is_extra_fee (its one real usage, the "extra-runner"
+# row, was deleted in 0002).
 
 import django.db.models.deletion
 from django.db import migrations, models
 
 
-def delete_extra_runner_category(apps, schema_editor):
-    Category = apps.get_model("registrations", "Category")
-    Category.objects.filter(code="extra-runner").delete()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("registrations", "0001_initial"),
+        ("registrations", "0002_delete_extra_runner_category"),
     ]
 
     operations = [
-        migrations.RunPython(delete_extra_runner_category, reverse_code=migrations.RunPython.noop),
         migrations.RemoveField(
             model_name="category",
             name="is_extra_fee",
