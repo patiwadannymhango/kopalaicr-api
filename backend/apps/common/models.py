@@ -31,11 +31,9 @@ class BaseRegistration(UUIDModel):
     its own independent numbering sequence, since abstract-model
     inheritance gives every subclass its own table.
 
-    Also defines the polymorphic interface apps.payments.services calls on
-    whatever `Payment.target` resolves to (confirm_payment/fail_payment/
-    mark_processing) — apps.registrations.models.RosterRunner implements
-    the same interface without inheriting from this class, so that code
-    never has to branch on target type. See RosterRunner's docstring.
+    Also defines the interface apps.payments.services calls on whatever
+    `Payment.target` resolves to (confirm_payment/fail_payment/
+    mark_processing), so that code never has to branch on target type.
     """
 
     REFERENCE_PREFIX = "REF"

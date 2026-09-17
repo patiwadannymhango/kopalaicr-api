@@ -139,12 +139,10 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    # No default authentication class: almost every endpoint here is
-    # genuinely public (categories, registration, payments, lookup). The
-    # two team-account endpoints that do need auth declare
-    # apps.registrations.auth.CaptainTokenAuthentication explicitly on
-    # themselves instead of adding a global authenticator that would try
-    # (and fail) to run against every other request.
+    # No authentication at all — every endpoint here is genuinely public
+    # (categories, registration, payments, lookup). There is no
+    # captain/user login on this API; Django's own /django-admin/ session
+    # auth is the only authenticated surface, and it doesn't go through DRF.
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",

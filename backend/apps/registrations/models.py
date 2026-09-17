@@ -1,6 +1,3 @@
-import secrets
-
-from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 
 from apps.common.models import BaseRegistration, UUIDModel
@@ -9,12 +6,10 @@ from apps.common.models import BaseRegistration, UUIDModel
 class Category(UUIDModel):
     """
     A priced entry — an individual race distance, or the team relay's
-    per-team / per-extra-runner fee. One table covers both entry types
-    (rather than a separate table per type, as apps.registrations has more
-    of these than the single-entry-type Kabwe reference did) — `entry_type`
-    tells the public categories endpoints which rows to return, and
-    `is_extra_fee` hides bookkeeping-only rows (the extra-runner fee) from
-    those public lists without needing a second endpoint just for it.
+    per-team fee. One table covers both entry types (rather than a
+    separate table per type, as apps.registrations has more of these than
+    the single-entry-type Kabwe reference did) — `entry_type` tells the
+    public categories endpoints which rows to return.
     """
 
     class EntryType(models.TextChoices):
@@ -28,11 +23,6 @@ class Category(UUIDModel):
     price = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, default="ZMW")
     capacity = models.PositiveIntegerField(null=True, blank=True)
-    # True only for the "extra-runner" row — a real fee, but not something
-    # a captain picks from a list, so it's excluded from the public
-    # /categories/ endpoints and looked up by code instead (see
-    # PublicExtraRunnerFeeView).
-    is_extra_fee = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -112,8 +102,8 @@ class IndividualRegistration(BaseRegistration):
     @property
     def contact(self):
         """The person to reach for this registration — generic name shared
-        with TeamRegistration.contact / RosterRunner.contact so payment
-        gateway code can treat all three uniformly."""
+        with TeamRegistration.contact so payment gateway code can treat
+        both uniformly."""
         return self.participant
 
     def notify_received(self):
@@ -134,12 +124,13 @@ class IndividualRegistration(BaseRegistration):
 
 class TeamRegistration(BaseRegistration):
     """
-    A company/institution's relay entry. Doubles as the captain's login
-    account — TeamAccount in the frontend's types.ts is exactly this
-    record plus its roster, there's no separate "account" model. Unlike
-    IndividualRegistration/Participant, the registrant's contact details
-    (captain_*) live directly on this model since a team has exactly one
-    accountable contact.
+    A company/institution's relay entry — captain details, category, and
+    the roster submitted at registration time. There is no captain
+    login/dashboard (removed — see git history if that's ever wanted
+    back); roster changes after registration go through Django admin.
+    Unlike IndividualRegistration/Participant, the registrant's contact
+    details (captain_*) live directly on this model since a team has
+    exactly one accountable contact.
     """
 
     class RelayCategory(models.TextChoices):
@@ -151,7 +142,7 @@ class TeamRegistration(BaseRegistration):
 
     category = models.ForeignKey(
         Category, on_delete=models.PROTECT, related_name="team_registrations",
-        limit_choices_to={"entry_type": Category.EntryType.TEAM, "is_extra_fee": False},
+        limit_choices_to={"entry_type": Category.EntryType.TEAM},
     )
     team_name = models.CharField(max_length=200)
     company_or_institution = models.CharField(max_length=200)
@@ -164,30 +155,14 @@ class TeamRegistration(BaseRegistration):
 
     captain_first_name = models.CharField(max_length=150)
     captain_last_name = models.CharField(max_length=150)
-    captain_email = models.EmailField(unique=True, db_index=True)
+    captain_email = models.EmailField(db_index=True)
     captain_phone = models.CharField(max_length=30)
-
-    password = models.CharField(max_length=128)
-    # Opaque bearer token, not a JWT — see apps.registrations.auth. No
-    # expiry/refresh: matches the frontend's single-stored-token model
-    # (src/api/http.ts), which never refreshes or rotates it either.
-    auth_token = models.CharField(max_length=64, unique=True, db_index=True)
 
     free_runner_limit = models.PositiveIntegerField()
     accepted_terms = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-registered_at"]
-
-    def set_password(self, raw_password):
-        self.password = make_password(raw_password)
-
-    def check_password(self, raw_password):
-        return check_password(raw_password, self.password)
-
-    @staticmethod
-    def generate_auth_token():
-        return secrets.token_urlsafe(32)
 
     # --- Gateway-facing contact interface (mirrors Participant) --------
 
@@ -225,68 +200,20 @@ class TeamRegistration(BaseRegistration):
 
 class RosterRunner(UUIDModel):
     """
-    One runner on a team's roster. The first `team.free_runner_limit`
-    runners are `covered` by the team's base entry fee; anyone added
-    beyond that owes their own extra-runner fee and starts out
-    `paid=False`.
-
-    Deliberately NOT a BaseRegistration — an extra runner's payment is a
-    small add-on, not a registration with its own lifecycle/reference
-    number. It duck-types just enough of the interface
-    apps.payments.services needs (contact/status/registration_number/
-    mark_processing/confirm_payment/fail_payment) to be usable as a
-    Payment target through the exact same generic payment code as
-    IndividualRegistration/TeamRegistration, with no branching there. See
-    apps.common.models.BaseRegistration's docstring.
+    One runner on a team's roster, submitted at registration time (up to
+    team.free_runner_limit — enforced in the serializer). Plain roster
+    entry, not a payment target — there's no self-service way to add more
+    after registration (that required the now-removed captain login); an
+    admin edits the roster inline on the TeamRegistration in
+    /django-admin/ if it ever needs to change.
     """
 
     team_registration = models.ForeignKey(TeamRegistration, on_delete=models.CASCADE, related_name="roster")
     full_name = models.CharField(max_length=200)
     gender = models.CharField(max_length=10, choices=Participant.Gender.choices, blank=True)
 
-    covered = models.BooleanField(default=False)
-    # Always True when covered. For an extra runner, False until their fee
-    # payment succeeds (see confirm_payment below).
-    paid = models.BooleanField(default=False)
-
-    # Only set for a non-covered runner — the extra-runner fee price at
-    # the moment they were added, snapshotted the same way
-    # BaseRegistration.amount locks in category.price at creation.
-    amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    currency = models.CharField(max_length=3, default="ZMW")
-
     class Meta:
         ordering = ["created_at"]
 
     def __str__(self):
         return self.full_name
-
-    @property
-    def contact(self):
-        # Billing details still belong to the captain — an extra runner
-        # has no email/phone of their own on the roster form.
-        return self.team_registration.contact
-
-    @property
-    def status(self):
-        return "CONFIRMED" if self.paid else "PENDING_PAYMENT"
-
-    @property
-    def registration_number(self):
-        # A roster add-on never gets its own reference. PublicPaymentStatusView
-        # exposes this as `reference`, which the frontend's roster-add flow
-        # ignores anyway (see TeamDashboard.tsx's usePendingPayment usage).
-        return None
-
-    def mark_processing(self):
-        pass  # nothing extra to persist — Payment.status already tracks this.
-
-    def confirm_payment(self):
-        self.paid = True
-        self.save(update_fields=["paid", "updated_at"])
-
-    def notify_confirmed(self):
-        pass  # no notification for an extra-runner fee payment — see the class docstring.
-
-    def fail_payment(self, *, reason=""):
-        pass  # stays paid=False; the captain just retries from the dashboard.

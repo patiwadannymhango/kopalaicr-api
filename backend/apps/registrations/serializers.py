@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration
+from .models import Category, IndividualRegistration, Participant, TeamRegistration
 
 # ---------------------------------------------------------------------------
 # Categories
@@ -123,9 +123,8 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
 
 
 class RunnerRosterEntrySerializer(serializers.Serializer):
-    """Mirrors the frontend's RunnerRosterEntry shape — used both for the
-    roster submitted at team registration and for one runner added later
-    via POST /team/me/roster/."""
+    """Mirrors the frontend's RunnerRosterEntry shape — the roster
+    submitted at team registration time."""
 
     fullName = serializers.CharField(max_length=200)
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
@@ -141,16 +140,10 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     captainPhone = serializers.CharField(max_length=30)
     roster = RunnerRosterEntrySerializer(many=True, required=False, default=list)
     acceptedTerms = serializers.BooleanField()
-    password = serializers.CharField(min_length=8, write_only=True)
 
     def validate_acceptedTerms(self, value):
         if not value:
             raise serializers.ValidationError("You must accept the terms and conditions.")
-        return value
-
-    def validate_captainEmail(self, value):
-        if TeamRegistration.objects.filter(captain_email__iexact=value).exists():
-            raise serializers.ValidationError("An account with this email already exists — try logging in instead.")
         return value
 
     def validate_roster(self, value):
@@ -158,8 +151,7 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
 
         if len(value) > settings.TEAM_FREE_RUNNER_LIMIT:
             raise serializers.ValidationError(
-                f"Add up to {settings.TEAM_FREE_RUNNER_LIMIT} runners here — extra runners can be added from your "
-                "team dashboard after registering."
+                f"Add up to {settings.TEAM_FREE_RUNNER_LIMIT} runners here."
             )
         return value
 
@@ -175,49 +167,7 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
             "captain_phone": data["captainPhone"],
             "roster": data.get("roster", []),
             "accepted_terms": data["acceptedTerms"],
-            "password": data["password"],
         }
-
-
-class RosterRunnerSerializer(serializers.ModelSerializer):
-    """Mirrors the frontend's RosterRunner shape exactly."""
-
-    fullName = serializers.CharField(source="full_name")
-
-    class Meta:
-        model = RosterRunner
-        fields = ("id", "fullName", "gender", "covered", "paid")
-
-
-class TeamAccountSerializer(serializers.ModelSerializer):
-    """Mirrors the frontend's TeamAccount shape exactly."""
-
-    teamId = serializers.CharField(source="id")
-    teamName = serializers.CharField(source="team_name")
-    companyOrInstitution = serializers.CharField(source="company_or_institution")
-    relayCategory = serializers.CharField(source="relay_category")
-    captainEmail = serializers.CharField(source="captain_email")
-    reference = serializers.CharField(source="registration_number")
-    accountStatus = serializers.SerializerMethodField()
-    freeRunnerLimit = serializers.IntegerField(source="free_runner_limit")
-    roster = RosterRunnerSerializer(many=True)
-
-    class Meta:
-        model = TeamRegistration
-        fields = (
-            "teamId",
-            "teamName",
-            "companyOrInstitution",
-            "relayCategory",
-            "captainEmail",
-            "reference",
-            "accountStatus",
-            "freeRunnerLimit",
-            "roster",
-        )
-
-    def get_accountStatus(self, obj):
-        return "paid" if obj.status == TeamRegistration.Status.CONFIRMED else "unpaid"
 
 
 # ---------------------------------------------------------------------------

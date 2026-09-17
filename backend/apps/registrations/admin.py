@@ -28,7 +28,7 @@ class ConfirmOnSaveAdminMixin:
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "entry_type", "price", "currency", "capacity", "is_extra_fee", "is_active")
+    list_display = ("name", "code", "entry_type", "price", "currency", "capacity", "is_active")
     list_editable = ("price", "is_active")
     list_filter = ("entry_type", "is_active")
     search_fields = ("name", "code")
@@ -70,11 +70,9 @@ class RosterRunnerInline(admin.TabularInline):
 
 @admin.register(RosterRunner)
 class RosterRunnerAdmin(admin.ModelAdmin):
-    # Registered mainly so Payment's autocomplete_fields can look runners
-    # up by name — day-to-day roster editing happens via the
-    # TeamRegistration inline above.
-    list_display = ("full_name", "team_registration", "covered", "paid", "amount", "currency")
-    list_filter = ("covered", "paid")
+    # Day-to-day roster editing happens via the TeamRegistration inline
+    # above; this is mainly for searching/browsing runners across teams.
+    list_display = ("full_name", "team_registration", "gender")
     search_fields = ("full_name", "team_registration__team_name")
     autocomplete_fields = ("team_registration",)
 
@@ -95,8 +93,7 @@ class TeamRegistrationAdmin(ConfirmOnSaveAdminMixin, admin.ModelAdmin):
     list_filter = ("status", "relay_category")
     search_fields = ("registration_number", "team_name", "company_or_institution", "captain_email", "captain_phone")
     autocomplete_fields = ("category",)
-    readonly_fields = ("registration_number", "auth_token", "registered_at", "updated_at")
-    exclude = ("password",)
+    readonly_fields = ("registration_number", "registered_at", "updated_at")
     inlines = [RosterRunnerInline]
 
 

@@ -13,7 +13,6 @@ urlpatterns = [
     # same thing. This is Django's own built-in admin site.
     path("django-admin/", admin.site.urls),
     path("api/v1/health/", health, name="health"),
-    path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/", include("apps.registrations.urls")),
     path("api/v1/payments/", include("apps.payments.urls")),
 ]

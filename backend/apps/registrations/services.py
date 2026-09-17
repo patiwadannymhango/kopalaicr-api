@@ -61,20 +61,14 @@ def create_team_registration(
     captain_phone,
     roster,
     accepted_terms,
-    password,
 ):
     """
-    Create the team's account (captain login + roster) and its base entry
-    registration in one call — the frontend's submitTeamRegistration
-    creates the account and signs the captain in with the same request, so
-    there's no separate "now register a login" step.
+    Create the team's base entry registration and its roster in one call.
     """
 
-    category = Category.objects.get(
-        code="relay", entry_type=Category.EntryType.TEAM, is_extra_fee=False, is_active=True
-    )
+    category = Category.objects.get(code="relay", entry_type=Category.EntryType.TEAM, is_active=True)
 
-    team = TeamRegistration(
+    team = TeamRegistration.objects.create(
         category=category,
         team_name=team_name,
         company_or_institution=company_or_institution,
@@ -83,55 +77,19 @@ def create_team_registration(
         captain_last_name=captain_last_name,
         captain_email=captain_email.lower(),
         captain_phone=captain_phone,
-        auth_token=TeamRegistration.generate_auth_token(),
         free_runner_limit=settings.TEAM_FREE_RUNNER_LIMIT,
         accepted_terms=accepted_terms,
         amount=category.price,
         currency=category.currency,
     )
-    team.set_password(password)
-    team.save()
 
     for entry in roster[: settings.TEAM_FREE_RUNNER_LIMIT]:
         RosterRunner.objects.create(
             team_registration=team,
             full_name=entry["fullName"],
             gender=entry.get("gender", ""),
-            covered=True,
-            paid=True,
         )
 
     team.notify_received()
 
     return team
-
-
-@transaction.atomic
-def add_roster_runner(*, team, full_name, gender):
-    """
-    Add one runner to a team's roster. Whether this seat is free (still
-    within the team's covered allowance) or chargeable (an extra seat
-    beyond it) is decided here from the team's current roster size — the
-    caller doesn't get to say which.
-    """
-
-    current_count = team.roster.count()
-
-    if current_count < team.free_runner_limit:
-        runner = RosterRunner.objects.create(
-            team_registration=team, full_name=full_name, gender=gender, covered=True, paid=True
-        )
-        return runner, None
-
-    extra_fee_category = Category.objects.get(code="extra-runner", entry_type=Category.EntryType.TEAM, is_active=True)
-
-    runner = RosterRunner.objects.create(
-        team_registration=team,
-        full_name=full_name,
-        gender=gender,
-        covered=False,
-        paid=False,
-        amount=extra_fee_category.price,
-        currency=extra_fee_category.currency,
-    )
-    return runner, extra_fee_category

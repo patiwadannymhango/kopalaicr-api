@@ -2,9 +2,11 @@
 
 A Django REST API for the KCM Kopala Inter Company Relay 2026 registration
 site ([kopalaicr](../kopalaicr)). Built from the same pattern as the
-sibling Independence Run APIs, extended with a team/relay side those don't
-have: companies register a team with a captain login, and the captain later
-signs in to a dashboard to manage their roster.
+sibling Independence Run APIs, extended with a team/relay registration
+type those don't have: companies register a team with a full roster in
+one submission. (There used to be a captain login + self-service
+dashboard for managing the roster afterward — removed; roster changes
+after registration now go through Django admin.)
 
 **Live:** `https://13-245-40-232.sslip.io` (AWS EC2, Elastic IP, HTTPS via
 Caddy/Let's Encrypt). Pushes to `main` auto-deploy there via
@@ -30,18 +32,13 @@ kopalaicr-api/
   `Participant` + `IndividualRegistration` pair is created
   `PENDING_PAYMENT`.
 - **Team (relay) registration** — a company registers a team (name,
-  category, captain, an optional starting roster) and gets a login for the
-  captain in the same request — no separate sign-up step. The first 8
-  runners on the roster are covered by the team's one entry fee; anyone
-  added beyond that from the team dashboard owes their own small
-  extra-runner fee.
-- **Team dashboard login** — the captain signs in with their email +
-  password (set at registration) to check the team's payment status and
-  add more runners. Authenticated with a simple opaque bearer token (not
-  JWT) — see `apps/registrations/auth.py`.
+  category, captain, and its full roster — up to 8 runners) in one
+  request, covered by a single flat team entry fee. No login, no
+  self-service dashboard; if the roster needs to change after
+  registration, an admin edits it inline on the team in `/django-admin/`.
 - **Payments** — mobile money (MTN/Airtel/Zamtel), card, or bank transfer,
-  via a pluggable gateway, shared by individual registrations, a team's
-  base entry fee, and extra-runner fees alike:
+  via a pluggable gateway, shared by individual registrations and a
+  team's entry fee alike:
   - **`console`** (default) — no credentials needed. Simulates a payment
     settling ~5 seconds after being initiated, so the full
     register → pay → poll → confirmed flow works locally out of the box.
@@ -76,22 +73,16 @@ Public (no auth), consumed directly by the registration site:
 | GET | `/api/v1/registrations/individual/categories/` | Individual race categories + prices |
 | POST | `/api/v1/registrations/individual/` | Create an individual registration |
 | GET | `/api/v1/registrations/team/categories/` | The relay team entry fee |
-| POST | `/api/v1/registrations/team/` | Create a team registration + captain login |
-| GET | `/api/v1/registrations/team/extra-runner-fee/` | Per-runner fee beyond the free 8 |
+| POST | `/api/v1/registrations/team/` | Create a team registration (with its roster) |
 | GET | `/api/v1/registrations/lookup/?q=` | "Track your registration" by reference or email (individual or team) |
-| POST | `/api/v1/auth/team/login/` | Captain login (email + password → bearer token) |
 | POST | `/api/v1/payments/initiate/` | Start mobile money / card / bank transfer payment |
 | GET | `/api/v1/payments/<id>/status/` | Poll payment status |
 | POST | `/api/v1/payments/webhooks/lipila/` | Lipila's server-to-server callback |
 | GET | `/api/v1/payments/bank-details/` | Bank account details for bank transfer |
 
-Captain-authenticated (`Authorization: Bearer <token>` from the login
-response above):
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/v1/team/me/` | The logged-in captain's team account + roster |
-| POST | `/api/v1/team/me/roster/` | Add one runner to the roster |
+There is no authenticated API surface at all — every endpoint above is
+public, and the only login anywhere is Django's own `/django-admin/`
+session login.
 
 ## Running locally
 
@@ -149,10 +140,9 @@ python manage.py runserver
 Nothing in the `kopalaicr` frontend or design documents the real entry
 fees yet, so `seed_categories` seeds clearly-marked **placeholder** prices
 (ZMW 150 for the 10KM individual race, ZMW 100 for the 5KM fun run, ZMW
-800 for the relay team entry, ZMW 100 for the extra-runner fee). Edit
-these in `/django-admin/` → **Categories** before this goes live — the
-seed command is create-only, so it will never overwrite a price you've
-already changed there.
+800 for the relay team entry). Edit these in `/django-admin/` →
+**Categories** before this goes live — the seed command is create-only, so
+it will never overwrite a price you've already changed there.
 
 ## Testing payments locally
 
@@ -160,15 +150,12 @@ With the default `PAYMENT_GATEWAY=console`, no real money or credentials
 are involved: initiate a payment, then poll `/api/v1/payments/<id>/status/`
 — it flips from `PROCESSING` to `SUCCESS` on its own about 5 seconds after
 creation (see `apps/payments/gateways/console.py`), which also confirms
-the registration/team/roster-runner and sends the confirmation email/SMS
-(except for an extra-runner fee, which confirms silently — see
-`RosterRunner.confirm_payment` in `apps/registrations/models.py`).
+the registration and sends the confirmation email/SMS.
 
 Bank transfer skips the gateway entirely — the frontend doesn't even call
 `/payments/initiate/` for it, the registration just stays
-`PENDING_PAYMENT` (or the roster runner `paid=False`) until an admin
-manually confirms it once the transfer is reconciled against the bank
-statement (via `/django-admin/`).
+`PENDING_PAYMENT` until an admin manually confirms it once the transfer is
+reconciled against the bank statement (via `/django-admin/`).
 
 ## Switching on real Lipila payments
 

@@ -5,10 +5,10 @@ from .models import PaymentMethod
 
 class InitiatePaymentSerializer(serializers.Serializer):
     """Mirrors the frontend's InitiatePaymentParams shape exactly.
-    `registrationId` is looked up across IndividualRegistration,
-    TeamRegistration and RosterRunner (see InitiatePaymentView) — their
-    UUIDs never collide in practice, so the frontend doesn't need to say
-    which kind of target it's paying for."""
+    `registrationId` is looked up across IndividualRegistration and
+    TeamRegistration (see InitiatePaymentView) — their UUIDs never collide
+    in practice, so the frontend doesn't need to say which kind of target
+    it's paying for."""
 
     registrationId = serializers.UUIDField()
     paymentMethod = serializers.ChoiceField(choices=PaymentMethod.choices)

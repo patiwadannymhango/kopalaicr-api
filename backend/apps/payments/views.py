@@ -48,12 +48,11 @@ def _gateway_error_message(exc):
 
 
 def _find_target(registration_id):
-    from apps.registrations.models import IndividualRegistration, RosterRunner, TeamRegistration
+    from apps.registrations.models import IndividualRegistration, TeamRegistration
 
     return (
         IndividualRegistration.objects.filter(id=registration_id).first()
         or TeamRegistration.objects.filter(id=registration_id).first()
-        or RosterRunner.objects.filter(id=registration_id).first()
     )
 
 
@@ -70,10 +69,10 @@ class InitiatePaymentView(APIView):
     """
     POST /api/v1/payments/initiate/
 
-    Shared by every payable thing in this project — an individual
-    registration, a team's base entry, or one extra roster runner's fee —
-    `registrationId` is looked up across all three (see _find_target), so
-    the frontend doesn't need to say which kind it is.
+    Shared by both payable things in this project — an individual
+    registration or a team's base entry — `registrationId` is looked up
+    across both (see _find_target), so the frontend doesn't need to say
+    which kind it is.
     """
 
     permission_classes = [AllowAny]
@@ -168,9 +167,9 @@ class PublicPaymentStatusView(APIView):
 
     def get(self, request, payment_id):
         try:
-            payment = Payment.objects.select_related(
-                "individual_registration", "team_registration", "roster_runner"
-            ).get(id=payment_id)
+            payment = Payment.objects.select_related("individual_registration", "team_registration").get(
+                id=payment_id
+            )
         except Payment.DoesNotExist:
             return Response({"detail": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -181,10 +180,9 @@ class PublicPaymentStatusView(APIView):
             {
                 "status": payment.status,
                 "registrationStatus": target.status,
-                # Only set once the target reaches CONFIRMED (see
-                # BaseRegistration.save()) — this is how the frontend picks
-                # up the reference the moment it's actually assigned. Always
-                # None for a roster-runner payment (see RosterRunner.registration_number).
+                # Only set once the target reaches CONFIRMED — see
+                # BaseRegistration.save(). This is how the frontend picks up
+                # the reference the moment it's actually assigned.
                 "reference": target.registration_number,
             }
         )

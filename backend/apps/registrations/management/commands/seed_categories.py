@@ -28,14 +28,6 @@ CATEGORIES = [
         "price": "800.00",
         "description": "One entry fee covers the full 8-runner team, any division.",
     },
-    {
-        "code": "extra-runner",
-        "name": "Extra Runner Fee",
-        "entry_type": Category.EntryType.TEAM,
-        "price": "100.00",
-        "description": "Per-runner fee for anyone added to a team's roster beyond the free 8.",
-        "is_extra_fee": True,
-    },
 ]
 
 
@@ -58,7 +50,6 @@ class Command(BaseCommand):
                     "price": data["price"],
                     "description": data["description"],
                     "currency": "ZMW",
-                    "is_extra_fee": data.get("is_extra_fee", False),
                     "is_active": True,
                 },
             )

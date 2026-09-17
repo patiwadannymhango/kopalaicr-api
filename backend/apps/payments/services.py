@@ -8,12 +8,11 @@ from .models import Payment
 
 
 def create_payment(*, target, payment_method):
-    from apps.registrations.models import IndividualRegistration, RosterRunner, TeamRegistration
+    from apps.registrations.models import IndividualRegistration, TeamRegistration
 
     return Payment.objects.create(
         individual_registration=target if isinstance(target, IndividualRegistration) else None,
         team_registration=target if isinstance(target, TeamRegistration) else None,
-        roster_runner=target if isinstance(target, RosterRunner) else None,
         reference=f"PAY-{uuid.uuid4().hex[:16].upper()}",
         amount=target.amount,
         currency=target.currency,
@@ -77,10 +76,10 @@ def apply_payment_outcome(*, payment, provider_status, raw_response=None, respon
     PROCESSING forever even though the gateway already settled it.
 
     Delegates the actual state change to `payment.target.confirm_payment()`
-    / `.fail_payment(reason=...)` rather than touching target fields
-    directly — IndividualRegistration, TeamRegistration and RosterRunner
-    each implement that pair their own way (see their models), so this
-    stays target-type-agnostic.
+    / `.fail_payment(reason=...)` (both defined once on BaseRegistration —
+    see apps.common.models) rather than touching target fields directly,
+    so this stays target-type-agnostic between IndividualRegistration and
+    TeamRegistration.
     """
 
     if raw_response is not None:
