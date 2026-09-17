@@ -84,10 +84,10 @@ class IndividualRegistration(BaseRegistration):
     )
 
     t_shirt_size = models.CharField(max_length=10, choices=TShirtSize.choices, blank=True)
-    # Only meaningful for the 10KM Individual Race — the 5KM Fun Race &
-    # Walk has no divisions (matches INDIVIDUAL_DIVISIONS in the
-    # frontend's src/types.ts, only shown/required there when
-    # raceCategory === '10km-individual').
+    # Only meaningful for the 5KM, 10KM and 21KM Individual races — the
+    # 100m CEO/Directors races and Kids Athletics have none (matches
+    # INDIVIDUAL_DIVISIONS in the frontend's src/types.ts and
+    # DIVISION_RACE_CATEGORY_CODES in serializers.py).
     division = models.CharField(max_length=20, choices=Division.choices, blank=True)
     town_or_city = models.CharField(max_length=150, blank=True)
     club_or_institution = models.CharField(max_length=200, blank=True)

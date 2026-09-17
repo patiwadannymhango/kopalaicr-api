@@ -8,24 +8,52 @@ from apps.registrations.models import Category
 # edit them in /django-admin/ (Categories) before this goes live.
 CATEGORIES = [
     {
+        "code": "5km-individual",
+        "name": "5KM Individual Race & Walk",
+        "entry_type": Category.EntryType.INDIVIDUAL,
+        "price": "2.00",
+        "description": "Race it or walk it over 5KM — an easier distance for first-timers and casual runners.",
+    },
+    {
         "code": "10km-individual",
         "name": "10KM Individual Race",
         "entry_type": Category.EntryType.INDIVIDUAL,
-        "price": "150.00",
+        "price": "2.00",
         "description": "Men's Open, Women's Open, Corporate and Masters divisions.",
     },
     {
-        "code": "5km-fun-run",
-        "name": "5KM Fun Race & Walk",
+        "code": "21km-individual",
+        "name": "21KM Individual Race & Walk",
         "entry_type": Category.EntryType.INDIVIDUAL,
-        "price": "100.00",
-        "description": "Untimed fun run/walk, open to all ages and fitness levels.",
+        "price": "2.00",
+        "description": "Race it or walk it — same divisions as the 10KM.",
+    },
+    {
+        "code": "100m-ceo",
+        "name": "100m CEO Race",
+        "entry_type": Category.EntryType.INDIVIDUAL,
+        "price": "2.00",
+        "description": "A fun sprint reserved for company chief executives.",
+    },
+    {
+        "code": "100m-directors",
+        "name": "100m Directors Race",
+        "entry_type": Category.EntryType.INDIVIDUAL,
+        "price": "2.00",
+        "description": "A fun sprint for company directors and senior leadership.",
+    },
+    {
+        "code": "kids-athletics",
+        "name": "Kids Athletics",
+        "entry_type": Category.EntryType.INDIVIDUAL,
+        "price": "2.00",
+        "description": "Fun athletics activities for children on race day.",
     },
     {
         "code": "relay",
         "name": "10KM Corporate Relay — Team Entry",
         "entry_type": Category.EntryType.TEAM,
-        "price": "800.00",
+        "price": "2.00",
         "description": "One entry fee covers the full 8-runner team, any division.",
     },
 ]

@@ -73,11 +73,16 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
         except Category.DoesNotExist:
             raise serializers.ValidationError("Invalid race category.")
 
+    # Races with divisions (Men's Open, Women's Open, Corporate, Masters)
+    # — the 100m CEO/Directors races and Kids Athletics have none. Mirrors
+    # DIVISION_RACE_CATEGORIES in the frontend's IndividualRegistration.tsx.
+    DIVISION_RACE_CATEGORY_CODES = {"5km-individual", "10km-individual", "21km-individual"}
+
     def validate(self, attrs):
         category = attrs["raceCategory"]
 
-        if category.code == "10km-individual" and not attrs.get("division"):
-            raise serializers.ValidationError({"division": "Please choose a division for the 10KM Individual Race."})
+        if category.code in self.DIVISION_RACE_CATEGORY_CODES and not attrs.get("division"):
+            raise serializers.ValidationError({"division": "Please choose a division for your race."})
 
         if category.capacity is not None:
             current_count = IndividualRegistration.objects.filter(
