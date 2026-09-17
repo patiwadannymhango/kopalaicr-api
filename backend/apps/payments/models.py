@@ -75,3 +75,34 @@ class Payment(UUIDModel):
     def target(self):
         """The IndividualRegistration or TeamRegistration this payment is for."""
         return self.individual_registration or self.team_registration
+
+
+class Withdrawal(UUIDModel):
+    """
+    Cash physically taken out against money already collected for one
+    entry type — recorded by an admin from the dashboard (see
+    apps.payments.views.AdminWithdrawalListCreateView), not driven by a
+    payment gateway. Deliberately lean (no ledger/transaction machinery):
+    this project's dashboard only needs a running total per entry type,
+    computed as Sum(amount) — see
+    apps.registrations.admin_dashboard.compute_dashboard_stats, where
+    "Cash Available" = revenue collected minus Sum(Withdrawal.amount).
+    """
+
+    entry_type = models.CharField(max_length=20, choices=[("INDIVIDUAL", "Individual"), ("TEAM", "Team")])
+
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default="ZMW")
+
+    narration = models.CharField(max_length=255, blank=True, help_text="What the cash was withdrawn for.")
+
+    withdrawn_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="withdrawals"
+    )
+    withdrawn_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-withdrawn_at"]
+
+    def __str__(self):
+        return f"{self.entry_type} withdrawal of {self.amount} {self.currency}"

@@ -1,6 +1,8 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
-from .models import PaymentMethod
+from .models import PaymentMethod, Withdrawal
 
 
 class InitiatePaymentSerializer(serializers.Serializer):
@@ -49,3 +51,31 @@ class InitiatePaymentSerializer(serializers.Serializer):
             )
 
         return attrs
+
+
+# ---------------------------------------------------------------------------
+# Admin-facing — cash withdrawals
+# ---------------------------------------------------------------------------
+
+
+class AdminWithdrawalSerializer(serializers.ModelSerializer):
+    withdrawn_by_name = serializers.CharField(source="withdrawn_by.full_name", read_only=True, default="")
+
+    class Meta:
+        model = Withdrawal
+        fields = (
+            "id",
+            "entry_type",
+            "amount",
+            "currency",
+            "narration",
+            "withdrawn_by_name",
+            "withdrawn_at",
+        )
+        read_only_fields = ("id", "currency", "withdrawn_by_name", "withdrawn_at")
+
+
+class AdminWithdrawalCreateSerializer(serializers.Serializer):
+    entry_type = serializers.ChoiceField(choices=Withdrawal._meta.get_field("entry_type").choices)
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    narration = serializers.CharField(required=False, allow_blank=True, max_length=255)

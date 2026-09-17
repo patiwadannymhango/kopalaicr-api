@@ -21,6 +21,32 @@ def create_payment(*, target, payment_method):
     )
 
 
+def create_admin_cash_payment(*, target, payment_method="CASH"):
+    """
+    Back a registration an admin marks CONFIRMED directly (manual "add
+    person"/team, or editing status on an existing one) with a real
+    SUCCESS Payment row, same as create_payment() above but skipping
+    straight past the CREATED -> gateway flow (there's no gateway call to
+    make — the cash/transfer already happened before the admin is
+    recording it). Keeps the admin dashboard's revenue_confirmed (see
+    apps.registrations.admin_dashboard) accurate regardless of which path
+    a registration took to CONFIRMED: it's always backed by exactly one
+    SUCCESS Payment.
+    """
+    from apps.registrations.models import IndividualRegistration, TeamRegistration
+
+    return Payment.objects.create(
+        individual_registration=target if isinstance(target, IndividualRegistration) else None,
+        team_registration=target if isinstance(target, TeamRegistration) else None,
+        reference=f"PAY-{uuid.uuid4().hex[:16].upper()}",
+        amount=target.amount,
+        currency=target.currency,
+        payment_method=payment_method,
+        status=Payment.Status.SUCCESS,
+        paid_at=timezone.now(),
+    )
+
+
 def initiate_mobile_payment(*, payment, phone_number, callback_url):
     gateway = get_gateway()
 

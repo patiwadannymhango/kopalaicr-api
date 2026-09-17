@@ -8,13 +8,14 @@ from .managers import UserManager
 
 class User(UUIDModel, AbstractBaseUser, PermissionsMixin):
     """
-    Django-admin account (/django-admin/ only — there is no JWT/REST admin
-    API in this project, see README). There is no self-registration; the
-    first (and so far only) account is made with `createsuperuser`.
+    Staff account — signs into both /django-admin/ (session auth) and the
+    JWT admin API (apps.accounts) that backs the kopalaicr-admin
+    dashboard SPA. is_staff gates every admin/* endpoint (see
+    apps.common.permissions.IsStaffRole); there is no self-registration,
+    only `createsuperuser` or an existing admin via /django-admin/.
 
     Registrants and team captains never authenticate through this model —
-    the public registration/payment/lookup endpoints are open, and team
-    captains use their own opaque token (see apps.registrations.auth).
+    the public registration/payment/lookup endpoints are open.
     """
 
     email = models.EmailField(unique=True, db_index=True)

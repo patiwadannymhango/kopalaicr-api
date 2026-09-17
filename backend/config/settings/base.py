@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 from decouple import Csv, config
@@ -52,7 +53,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "django_filters",
     # This project
     "apps.common",
     "apps.accounts",
@@ -61,10 +64,10 @@ INSTALLED_APPS = [
     "apps.notifications",
 ]
 
-# Only used for Django's own session-based /django-admin/ login — there is
-# no JWT/REST admin API in this project (see README). Runners and team
-# captains never touch this; captains authenticate via their own opaque
-# token (apps/registrations/auth.py), unrelated to this user model.
+# Also backs the JWT admin API's login (apps.accounts) — the admin
+# dashboard SPA at kopalaicr-admin authenticates against this same User
+# model via /api/v1/auth/login/. Runners and team captains never touch
+# this; the public registration/payment/lookup endpoints stay AllowAny.
 AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
@@ -78,6 +81,15 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
 
 ROOT_URLCONF = "config.urls"
 
@@ -139,13 +151,22 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    # No authentication at all — every endpoint here is genuinely public
-    # (categories, registration, payments, lookup). There is no
-    # captain/user login on this API; Django's own /django-admin/ session
-    # auth is the only authenticated surface, and it doesn't go through DRF.
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    # JWT backs the admin dashboard SPA (kopalaicr-admin); every public
+    # endpoint (categories, registration, payments, lookup) sets its own
+    # permission_classes = [AllowAny] regardless of the default below, so
+    # adding auth here doesn't touch them.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    # Safer default: endpoints must opt IN to being public rather than
+    # opt out of requiring auth.
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
@@ -153,7 +174,10 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176",
+    # 5173-5176: the public kopalaicr site's Vite dev port (and its next
+    # few free-port fallbacks). 5177-5179: kopalaicr-admin's, started
+    # separately/later so Vite lands a few slots further along.
+    default="http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179",
     cast=Csv(),
 )
 

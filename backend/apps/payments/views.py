@@ -2,15 +2,17 @@ import json
 
 from django.conf import settings
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.models import BaseRegistration
+from apps.common.permissions import IsStaffRole
 
 from .gateways.lipila.security import InvalidLipilaWebhook, verify_lipila_webhook
-from .models import Payment, PaymentMethod
-from .serializers import InitiatePaymentSerializer
+from .models import Payment, PaymentMethod, Withdrawal
+from .serializers import AdminWithdrawalCreateSerializer, AdminWithdrawalSerializer, InitiatePaymentSerializer
 from .services import apply_payment_outcome, create_payment, initiate_card_payment, initiate_mobile_payment, sync_payment_status
 
 
@@ -246,3 +248,36 @@ class LipilaWebhookView(APIView):
         apply_payment_outcome(
             payment=payment, provider_status=data.get("status") or "", raw_response=data, response_key="webhook"
         )
+
+
+# ---------------------------------------------------------------------------
+# Admin-facing — cash withdrawals
+# ---------------------------------------------------------------------------
+
+
+class AdminWithdrawalListCreateView(ListAPIView):
+    """
+    GET  /api/v1/payments/admin/withdrawals/?entry_type=INDIVIDUAL|TEAM
+    POST /api/v1/payments/admin/withdrawals/
+
+    Records cash physically taken out of what's been collected for one
+    entry type — feeds "Cash Withdrawn" / "Cash Available" on that
+    entry type's dashboard (see apps.registrations.admin_dashboard).
+    """
+
+    permission_classes = [IsAuthenticated, IsStaffRole]
+    serializer_class = AdminWithdrawalSerializer
+    filterset_fields = ["entry_type"]
+    ordering_fields = ["withdrawn_at", "amount"]
+    queryset = Withdrawal.objects.select_related("withdrawn_by")
+
+    def post(self, request):
+        serializer = AdminWithdrawalCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        withdrawal = Withdrawal.objects.create(
+            withdrawn_by=request.user,
+            **serializer.validated_data,
+        )
+
+        return Response(AdminWithdrawalSerializer(withdrawal).data, status=status.HTTP_201_CREATED)

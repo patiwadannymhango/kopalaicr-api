@@ -52,17 +52,18 @@ kopalaicr-api/
   later). Email defaults to Django's console backend in dev, real SMTP in
   production.
 - **Admin** — Django's built-in admin site at `/django-admin/`: full CRUD
-  over categories, registrations, team rosters, payments and the
-  notification log. Manually flipping a registration's status to
+  over categories, registrations, team rosters, payments, withdrawals and
+  the notification log. Manually flipping a registration's status to
   `CONFIRMED` there (e.g. reconciling a bank transfer) sends the same
   confirmation email/SMS a real payment would.
 
-  There's deliberately no separate JWT-protected admin REST API here (the
-  Kabwe reference this was built from has one, for a future admin
-  dashboard SPA) — nothing in the `kopalaicr` frontend needs it yet.
-  Django admin covers day-to-day admin work for now; that surface can be
-  added later, largely copy-paste from the Kabwe reference, once an admin
-  dashboard actually exists to consume it.
+  There's also a JWT-protected admin REST API (`apps.accounts` +
+  `admin/*` views in `apps.registrations`/`apps.payments`, largely
+  copy-pasted from the Kabwe reference this project follows) backing the
+  separate [kopalaicr-admin](../kopalaicr-admin) dashboard SPA — see
+  "Admin API" below. Day-to-day category/user management still goes
+  through `/django-admin/`; only registrations, dashboard stats and cash
+  withdrawals are exposed to the SPA.
 
 ## API surface
 
@@ -80,9 +81,40 @@ Public (no auth), consumed directly by the registration site:
 | POST | `/api/v1/payments/webhooks/lipila/` | Lipila's server-to-server callback |
 | GET | `/api/v1/payments/bank-details/` | Bank account details for bank transfer |
 
-There is no authenticated API surface at all — every endpoint above is
-public, and the only login anywhere is Django's own `/django-admin/`
-session login.
+### Admin API
+
+JWT-authenticated (`is_staff` accounts only — created with
+`createsuperuser` or in `/django-admin/`), consumed by
+[kopalaicr-admin](../kopalaicr-admin):
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/v1/auth/login/` | Email + password → access/refresh tokens |
+| POST | `/api/v1/auth/refresh/` | Refresh an expired access token |
+| GET | `/api/v1/auth/me/` | The signed-in admin's own profile |
+| GET | `/api/v1/registrations/admin/individual/dashboard/` | Individual stats: counts by status, revenue collected/pending/today, total income, cash withdrawn/available |
+| GET | `/api/v1/registrations/admin/individual/filters/` | Filter facets (categories, genders, clubs/institutions) |
+| GET | `/api/v1/registrations/admin/individual/registrations/` | List, with `?search=`/`?status=`/`?category=`/`?gender=`/`?organisation=`/`?ordering=` |
+| POST | `/api/v1/registrations/admin/individual/registrations/create/` | Manual "Add person" (walk-in/phone) |
+| GET/PATCH/DELETE | `/api/v1/registrations/admin/individual/registrations/<id>/` | View, edit, or delete one registration |
+| GET | `/api/v1/registrations/admin/individual/registrations/export/` | Download all individual registrations as .xlsx |
+| GET | `/api/v1/registrations/admin/individual/registrations/bulk-upload/template/` | Download the bulk-upload .xlsx template |
+| POST | `/api/v1/registrations/admin/individual/registrations/bulk-upload/` | Bulk-create from an uploaded CSV/XLSX |
+| GET | `/api/v1/registrations/admin/team/dashboard/` | Same shape as the individual dashboard, scoped to team entries |
+| GET | `/api/v1/registrations/admin/team/filters/` | Filter facets (categories, relay categories) |
+| GET | `/api/v1/registrations/admin/team/registrations/` | List, with `?search=`/`?status=`/`?category=`/`?relay_category=`/`?ordering=` |
+| POST | `/api/v1/registrations/admin/team/registrations/create/` | Manual "Add team" (with roster) |
+| GET/PATCH/DELETE | `/api/v1/registrations/admin/team/registrations/<id>/` | View, edit, or delete one team (no roster edits — see below) |
+| GET | `/api/v1/registrations/admin/team/registrations/export/` | Download all team registrations as .xlsx |
+| GET/POST | `/api/v1/payments/admin/withdrawals/?entry_type=INDIVIDUAL\|TEAM` | List/record a cash withdrawal against one entry type's collected revenue |
+
+Manually marking a registration `CONFIRMED` through this API (creating one
+with that status, or PATCHing to it) books a matching `SUCCESS` `Payment`
+under the chosen `payment_method` (defaults to `CASH`) — so "revenue
+collected" on the dashboard is always backed by a real payment record,
+whether it came in online or was recorded at a walk-in desk. Team roster
+edits stay `/django-admin/`-only, per the note above about the removed
+captain dashboard.
 
 ## Running locally
 
@@ -101,7 +133,8 @@ change it in `docker-compose.yml` if that's not a concern for you). On
 first boot the entrypoint runs migrations and seeds the categories
 automatically.
 
-Create an admin login (for `/django-admin/`):
+Create an admin login (for `/django-admin/` **and** the [kopalaicr-admin](../kopalaicr-admin)
+dashboard — same account, `createsuperuser` sets `is_staff=True`):
 
 ```bash
 docker compose exec backend python manage.py createsuperuser
@@ -113,7 +146,13 @@ Confirm it's up:
 curl http://localhost:8004/api/v1/registrations/individual/categories/
 ```
 
-Point the frontend at it — in `kopalaicr/.env`:
+Point the public site at it — in `kopalaicr/.env`:
+
+```
+VITE_API_BASE_URL=http://localhost:8004
+```
+
+Point the admin dashboard at it — in `kopalaicr-admin/.env`:
 
 ```
 VITE_API_BASE_URL=http://localhost:8004

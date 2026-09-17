@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from .models import Category, IndividualRegistration, Participant, TeamRegistration
+from apps.payments.models import PaymentMethod
+
+from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration
 
 # ---------------------------------------------------------------------------
 # Categories
@@ -256,3 +258,221 @@ def _payment_info(payment):
         "address": billing.get("address", ""),
         "zipCode": billing.get("zip_code", ""),
     }
+
+
+# ---------------------------------------------------------------------------
+# Admin-facing — Individual
+# ---------------------------------------------------------------------------
+
+
+class AdminParticipantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Participant
+        fields = ("id", "full_name", "email", "phone", "gender", "age_range", "country")
+
+
+class AdminIndividualRegistrationSerializer(serializers.ModelSerializer):
+    """List/detail shape for the admin dashboard's Individual table."""
+
+    participant = AdminParticipantSerializer(read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    category_code = serializers.CharField(source="category.code", read_only=True)
+
+    class Meta:
+        model = IndividualRegistration
+        fields = (
+            "id",
+            "registration_number",
+            "status",
+            "amount",
+            "currency",
+            "participant",
+            "category",
+            "category_name",
+            "category_code",
+            "t_shirt_size",
+            "division",
+            "town_or_city",
+            "club_or_institution",
+            "emergency_contact_name",
+            "emergency_contact_phone",
+            "medical_notes",
+            "registered_at",
+            "updated_at",
+        )
+
+
+class AdminIndividualRegistrationUpdateSerializer(serializers.Serializer):
+    """
+    PATCH payload — any mix of participant fields and registration
+    fields. Deliberately no `email` field: same "can't be changed after
+    registration" rule as the public/kabwe admin APIs this follows.
+    """
+
+    PARTICIPANT_FIELDS = {"full_name", "phone", "gender", "age_range", "country"}
+
+    full_name = serializers.CharField(required=False, max_length=200)
+    phone = serializers.CharField(required=False, max_length=30)
+    gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
+    age_range = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
+    country = serializers.CharField(required=False, allow_blank=True, max_length=100)
+
+    t_shirt_size = serializers.ChoiceField(
+        choices=IndividualRegistration.TShirtSize.choices, required=False, allow_blank=True
+    )
+    division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
+    town_or_city = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    club_or_institution = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    emergency_contact_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    emergency_contact_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    medical_notes = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(choices=IndividualRegistration.Status.choices, required=False)
+
+
+class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
+    """POST payload for the admin's "Add person" — a walk-in/phone
+    registration, same fields as the public form plus `status` and, when
+    that status is CONFIRMED, the `payment_method` to record cash/EFT
+    actually received under (see apps.payments.services.create_admin_cash_payment)."""
+
+    category_id = serializers.PrimaryKeyRelatedField(
+        source="category", queryset=Category.objects.filter(entry_type=Category.EntryType.INDIVIDUAL)
+    )
+    full_name = serializers.CharField(max_length=200)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
+    age_range = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
+    country = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    t_shirt_size = serializers.ChoiceField(
+        choices=IndividualRegistration.TShirtSize.choices, required=False, allow_blank=True
+    )
+    division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
+    town_or_city = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    club_or_institution = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    emergency_contact_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    emergency_contact_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    medical_notes = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(
+        choices=IndividualRegistration.Status.choices, default=IndividualRegistration.Status.CONFIRMED
+    )
+    payment_method = serializers.ChoiceField(choices=PaymentMethod.choices, required=False, default=PaymentMethod.CASH)
+
+    def to_registration_kwargs(self):
+        data = self.validated_data
+        return {
+            "category": data["category"],
+            "participant_data": {
+                "full_name": data["full_name"],
+                "email": data.get("email", ""),
+                "phone": data.get("phone", ""),
+                "gender": data.get("gender", ""),
+                "age_range": data.get("age_range", ""),
+                "country": data.get("country", ""),
+            },
+            "details": {
+                "t_shirt_size": data.get("t_shirt_size", ""),
+                "division": data.get("division", ""),
+                "town_or_city": data.get("town_or_city", ""),
+                "club_or_institution": data.get("club_or_institution", ""),
+                "emergency_contact_name": data.get("emergency_contact_name", ""),
+                "emergency_contact_phone": data.get("emergency_contact_phone", ""),
+                "medical_notes": data.get("medical_notes", ""),
+                "accepted_terms": True,
+            },
+            "status": data["status"],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Admin-facing — Team
+# ---------------------------------------------------------------------------
+
+
+class AdminRosterRunnerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RosterRunner
+        fields = ("id", "full_name", "gender")
+
+
+class AdminTeamRegistrationSerializer(serializers.ModelSerializer):
+    roster = AdminRosterRunnerSerializer(many=True, read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
+    class Meta:
+        model = TeamRegistration
+        fields = (
+            "id",
+            "registration_number",
+            "status",
+            "amount",
+            "currency",
+            "team_name",
+            "company_or_institution",
+            "relay_category",
+            "captain_first_name",
+            "captain_last_name",
+            "captain_email",
+            "captain_phone",
+            "free_runner_limit",
+            "roster",
+            "category",
+            "category_name",
+            "registered_at",
+            "updated_at",
+        )
+
+
+class AdminTeamRegistrationUpdateSerializer(serializers.Serializer):
+    """
+    PATCH payload. No `captain_email` (same "can't change after
+    registration" rule) and no `roster` — roster edits stay
+    Django-admin-only, per the README (this project never had a
+    self-service captain dashboard to begin with).
+    """
+
+    team_name = serializers.CharField(required=False, max_length=200)
+    company_or_institution = serializers.CharField(required=False, max_length=200)
+    relay_category = serializers.ChoiceField(choices=TeamRegistration.RelayCategory.choices, required=False)
+    captain_first_name = serializers.CharField(required=False, max_length=150)
+    captain_last_name = serializers.CharField(required=False, max_length=150)
+    captain_phone = serializers.CharField(required=False, max_length=30)
+    status = serializers.ChoiceField(choices=TeamRegistration.Status.choices, required=False)
+
+
+class AdminManualTeamRegistrationSerializer(serializers.Serializer):
+    """POST payload for the admin's "Add team" — same shape as the public
+    team form plus `status`/`payment_method` (see
+    AdminManualIndividualRegistrationSerializer's docstring)."""
+
+    team_name = serializers.CharField(max_length=200)
+    company_or_institution = serializers.CharField(max_length=200)
+    relay_category = serializers.ChoiceField(choices=TeamRegistration.RelayCategory.choices)
+    captain_first_name = serializers.CharField(max_length=150)
+    captain_last_name = serializers.CharField(max_length=150)
+    captain_email = serializers.EmailField()
+    captain_phone = serializers.CharField(max_length=30)
+    roster = RunnerRosterEntrySerializer(many=True, required=False, default=list)
+    status = serializers.ChoiceField(choices=TeamRegistration.Status.choices, default=TeamRegistration.Status.CONFIRMED)
+    payment_method = serializers.ChoiceField(choices=PaymentMethod.choices, required=False, default=PaymentMethod.CASH)
+
+    def validate_roster(self, value):
+        from django.conf import settings
+
+        if len(value) > settings.TEAM_FREE_RUNNER_LIMIT:
+            raise serializers.ValidationError(f"Add up to {settings.TEAM_FREE_RUNNER_LIMIT} runners here.")
+        return value
+
+    def to_registration_kwargs(self):
+        data = self.validated_data
+        return {
+            "team_name": data["team_name"],
+            "company_or_institution": data["company_or_institution"],
+            "relay_category": data["relay_category"],
+            "captain_first_name": data["captain_first_name"],
+            "captain_last_name": data["captain_last_name"],
+            "captain_email": data["captain_email"],
+            "captain_phone": data["captain_phone"],
+            "roster": data.get("roster", []),
+            "accepted_terms": True,
+        }

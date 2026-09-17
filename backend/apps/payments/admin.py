@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Payment
+from .models import Payment, Withdrawal
 
 
 @admin.register(Payment)
@@ -24,3 +24,11 @@ class PaymentAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ("individual_registration", "team_registration")
     readonly_fields = ("reference", "provider_reference", "provider_response", "created_at", "updated_at")
+
+
+@admin.register(Withdrawal)
+class WithdrawalAdmin(admin.ModelAdmin):
+    list_display = ("entry_type", "amount", "currency", "withdrawn_by", "withdrawn_at")
+    list_filter = ("entry_type",)
+    search_fields = ("narration",)
+    readonly_fields = ("withdrawn_at",)
