@@ -159,14 +159,15 @@ CORS_ALLOWED_ORIGINS = config(
     cast=Csv(),
 )
 
-# Any subdomain of kopalaicr.com (www., admin., app., anything the user
-# adds later) is allowed through CORS without needing a redeploy each time
-# a new one is introduced — kopalaicr.com is this project's own domain, not
-# a shared one, so a wildcard here is safe (unlike e.g. *.vercel.app, which
-# is shared with every other Vercel project and stays an explicit entry in
-# CORS_ALLOWED_ORIGINS above instead).
+# Any subdomain of kopalaicr2026.com — the project's actual registered
+# domain — (www., admin., app., anything added later) is allowed through
+# CORS without needing a redeploy each time a new one is introduced.
+# Matches the bare domain too (the `(...)*'` group allows zero subdomain
+# segments). Safe as a wildcard because it's this project's own domain,
+# not a shared one (unlike e.g. *.vercel.app, which stays an explicit
+# entry in CORS_ALLOWED_ORIGINS above instead).
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://([a-z0-9-]+\.)*kopalaicr\.com$",
+    r"^https://([a-z0-9-]+\.)*kopalaicr2026\.com$",
 ]
 
 
