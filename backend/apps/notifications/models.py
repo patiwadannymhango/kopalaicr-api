@@ -33,6 +33,13 @@ class Notification(UUIDModel):
         blank=True,
         related_name="notifications",
     )
+    vendor_registration = models.ForeignKey(
+        "registrations.VendorRegistration",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
 
     channel = models.CharField(max_length=10, choices=Channel.choices)
     notification_type = models.CharField(max_length=30, choices=NotificationType.choices)

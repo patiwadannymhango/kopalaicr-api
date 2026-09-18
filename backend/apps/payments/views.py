@@ -50,11 +50,12 @@ def _gateway_error_message(exc):
 
 
 def _find_target(registration_id):
-    from apps.registrations.models import IndividualRegistration, TeamRegistration
+    from apps.registrations.models import IndividualRegistration, TeamRegistration, VendorRegistration
 
     return (
         IndividualRegistration.objects.filter(id=registration_id).first()
         or TeamRegistration.objects.filter(id=registration_id).first()
+        or VendorRegistration.objects.filter(id=registration_id).first()
     )
 
 
@@ -169,9 +170,9 @@ class PublicPaymentStatusView(APIView):
 
     def get(self, request, payment_id):
         try:
-            payment = Payment.objects.select_related("individual_registration", "team_registration").get(
-                id=payment_id
-            )
+            payment = Payment.objects.select_related(
+                "individual_registration", "team_registration", "vendor_registration"
+            ).get(id=payment_id)
         except Payment.DoesNotExist:
             return Response({"detail": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
 

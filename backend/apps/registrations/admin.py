@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from apps.common.models import BaseRegistration
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration
+from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration, VendorRegistration
 
 
 class ConfirmOnSaveAdminMixin:
@@ -95,6 +95,24 @@ class TeamRegistrationAdmin(ConfirmOnSaveAdminMixin, admin.ModelAdmin):
     autocomplete_fields = ("category",)
     readonly_fields = ("registration_number", "registered_at", "updated_at")
     inlines = [RosterRunnerInline]
+
+
+@admin.register(VendorRegistration)
+class VendorRegistrationAdmin(ConfirmOnSaveAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "registration_number",
+        "business_name",
+        "contact_person",
+        "category",
+        "status",
+        "amount",
+        "currency",
+        "registered_at",
+    )
+    list_filter = ("status", "category", "requirement")
+    search_fields = ("registration_number", "business_name", "contact_person", "contact_email", "contact_phone")
+    autocomplete_fields = ("category",)
+    readonly_fields = ("registration_number", "registered_at", "updated_at")
 
 
 admin.site.site_header = "Kopala ICR 2026"

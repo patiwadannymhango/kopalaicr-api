@@ -20,6 +20,8 @@ from .views import (
     PublicRegistrationLookupView,
     PublicTeamCategoryListView,
     PublicTeamRegistrationCreateView,
+    PublicVendorCategoryListView,
+    PublicVendorRegistrationCreateView,
 )
 
 urlpatterns = [
@@ -37,6 +39,9 @@ urlpatterns = [
     # Team — public
     path("registrations/team/categories/", PublicTeamCategoryListView.as_view(), name="team-category-list"),
     path("registrations/team/", PublicTeamRegistrationCreateView.as_view(), name="team-registration-create"),
+    # Vendor — public
+    path("registrations/vendor/categories/", PublicVendorCategoryListView.as_view(), name="vendor-category-list"),
+    path("registrations/vendor/", PublicVendorRegistrationCreateView.as_view(), name="vendor-registration-create"),
     # Lookup — public
     path("registrations/lookup/", PublicRegistrationLookupView.as_view(), name="registration-lookup"),
     # Individual — admin

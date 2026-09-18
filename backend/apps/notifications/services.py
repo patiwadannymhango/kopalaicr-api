@@ -229,3 +229,98 @@ def notify_team_payment_failed(team, *, reason=""):
             target=team,
             notification_type=Notification.NotificationType.PAYMENT_FAILED,
         )
+
+
+# ---------------------------------------------------------------------------
+# Vendor / exhibitor registrations — same lifecycle/notification shape as
+# individuals and teams (see module docstring), addressed to the business's
+# contact person. A free category (e.g. Official Sponsor) skips straight to
+# notify_vendor_payment_confirmed — see create_vendor_registration.
+# ---------------------------------------------------------------------------
+
+
+def notify_vendor_registration_received(vendor):
+    text = (
+        f"Hi {vendor.contact_person},\n\n"
+        f"We've received {vendor.business_name}'s vendor registration for {settings.EVENT_NAME}.\n"
+        f"Category: {vendor.category.name}\n"
+        f"Amount due: {vendor.currency} {vendor.amount}\n\n"
+        "Complete payment to confirm your stall and receive your registration reference.\n"
+    )
+
+    if vendor.contact_phone:
+        send_sms(
+            to=vendor.contact_phone,
+            message=text,
+            target=vendor,
+            notification_type=Notification.NotificationType.REGISTRATION_RECEIVED,
+        )
+
+
+def notify_vendor_payment_confirmed(vendor):
+    """The one email a vendor gets — mirrors notify_individual_payment_confirmed."""
+
+    subject = f"You're confirmed — {vendor.registration_number}"
+    text = (
+        f"Hi {vendor.contact_person},\n\n"
+        f"{vendor.business_name}'s vendor entry for {settings.EVENT_NAME} is confirmed"
+        f"{' and paid' if vendor.amount else ''}. This email is your proof of registration.\n\n"
+        f"Reference: {vendor.registration_number}\n"
+        f"Category: {vendor.category.name}\n"
+        f"Amount paid: {vendor.currency} {vendor.amount}\n"
+        f"Event date: {settings.EVENT_DATE}\n"
+        f"Venue: {settings.EVENT_LOCATION}\n\n"
+        "Our team will be in touch about stall setup ahead of race day.\n"
+    )
+
+    html = render_to_string(
+        "notifications/emails/vendor_registration_confirmed.html",
+        {
+            "contact_person": vendor.contact_person,
+            "event_name": settings.EVENT_NAME,
+            "reference": vendor.registration_number,
+            "business_name": vendor.business_name,
+            "category_name": vendor.category.name,
+            "currency": vendor.currency,
+            "amount": vendor.amount,
+            "event_date": settings.EVENT_DATE,
+            "event_location": settings.EVENT_LOCATION,
+            "contact_email": settings.EVENT_CONTACT_EMAIL or settings.DEFAULT_FROM_EMAIL,
+            "contact_phone": settings.EVENT_CONTACT_PHONE,
+        },
+    )
+
+    if vendor.contact_email:
+        send_email(
+            to=vendor.contact_email,
+            subject=subject,
+            text_body=text,
+            html_body=html,
+            target=vendor,
+            notification_type=Notification.NotificationType.PAYMENT_CONFIRMED,
+        )
+
+    if vendor.contact_phone:
+        send_sms(
+            to=vendor.contact_phone,
+            message=text,
+            target=vendor,
+            notification_type=Notification.NotificationType.PAYMENT_CONFIRMED,
+        )
+
+
+def notify_vendor_payment_failed(vendor, *, reason=""):
+    text = (
+        f"Hi {vendor.contact_person},\n\n"
+        f"We couldn't confirm payment for {vendor.business_name}'s vendor registration for "
+        f"{settings.EVENT_NAME}{f' ({reason})' if reason else ''}.\n\n"
+        "Please try again, or contact us for help.\n"
+    )
+
+    if vendor.contact_phone:
+        send_sms(
+            to=vendor.contact_phone,
+            message=text,
+            target=vendor,
+            notification_type=Notification.NotificationType.PAYMENT_FAILED,
+        )

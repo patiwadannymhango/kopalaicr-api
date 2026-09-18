@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.payments.models import PaymentMethod
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration
+from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration, VendorRegistration
 
 # ---------------------------------------------------------------------------
 # Categories
@@ -173,6 +173,50 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
             "captain_email": data["captainEmail"],
             "captain_phone": data["captainPhone"],
             "roster": data.get("roster", []),
+            "accepted_terms": data["acceptedTerms"],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Vendor / exhibitor registration
+# ---------------------------------------------------------------------------
+
+
+class PublicVendorRegistrationCreateSerializer(serializers.Serializer):
+    """Mirrors the frontend's VendorDetails shape (camelCase)."""
+
+    businessName = serializers.CharField(max_length=200)
+    contactPerson = serializers.CharField(max_length=200)
+    phone = serializers.CharField(max_length=30)
+    email = serializers.EmailField()
+    businessLocation = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    productsServices = serializers.CharField(required=False, allow_blank=True)
+    category = serializers.CharField()
+    requirement = serializers.ChoiceField(choices=VendorRegistration.Requirement.choices, required=False, allow_blank=True)
+    acceptedTerms = serializers.BooleanField()
+
+    def validate_acceptedTerms(self, value):
+        if not value:
+            raise serializers.ValidationError("You must accept the terms and conditions.")
+        return value
+
+    def validate_category(self, value):
+        try:
+            return Category.objects.get(code=value, entry_type=Category.EntryType.VENDOR, is_active=True)
+        except Category.DoesNotExist:
+            raise serializers.ValidationError("Invalid vendor category.")
+
+    def to_registration_kwargs(self):
+        data = self.validated_data
+        return {
+            "category": data["category"],
+            "business_name": data["businessName"],
+            "contact_person": data["contactPerson"],
+            "contact_email": data["email"],
+            "contact_phone": data["phone"],
+            "business_location": data.get("businessLocation", ""),
+            "products_services": data.get("productsServices", ""),
+            "requirement": data.get("requirement", ""),
             "accepted_terms": data["acceptedTerms"],
         }
 

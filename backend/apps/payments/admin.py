@@ -9,6 +9,7 @@ class PaymentAdmin(admin.ModelAdmin):
         "reference",
         "individual_registration",
         "team_registration",
+        "vendor_registration",
         "amount",
         "currency",
         "status",
@@ -21,8 +22,9 @@ class PaymentAdmin(admin.ModelAdmin):
         "provider_reference",
         "individual_registration__registration_number",
         "team_registration__registration_number",
+        "vendor_registration__registration_number",
     )
-    autocomplete_fields = ("individual_registration", "team_registration")
+    autocomplete_fields = ("individual_registration", "team_registration", "vendor_registration")
     readonly_fields = ("reference", "provider_reference", "provider_response", "created_at", "updated_at")
 
 

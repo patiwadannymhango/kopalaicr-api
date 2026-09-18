@@ -26,10 +26,11 @@ from .serializers import (
     CategorySerializer,
     PublicIndividualRegistrationCreateSerializer,
     PublicTeamRegistrationCreateSerializer,
+    PublicVendorRegistrationCreateSerializer,
     serialize_individual_record,
     serialize_team_record,
 )
-from .services import create_individual_registration, create_team_registration
+from .services import create_individual_registration, create_team_registration, create_vendor_registration
 
 # ---------------------------------------------------------------------------
 # Individual registration
@@ -104,6 +105,50 @@ class PublicTeamRegistrationCreateView(APIView):
                 "reference": team.registration_number,
                 "amount": float(team.amount),
                 "currency": team.currency,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Vendor / exhibitor registration
+# ---------------------------------------------------------------------------
+
+
+class PublicVendorCategoryListView(APIView):
+    """GET /api/v1/registrations/vendor/categories/"""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        categories = Category.objects.filter(entry_type=Category.EntryType.VENDOR, is_active=True)
+        return Response(CategorySerializer(categories, many=True).data)
+
+
+class PublicVendorRegistrationCreateView(APIView):
+    """
+    POST /api/v1/registrations/vendor/
+
+    Unlike individual/team, a free category (e.g. Official Sponsor)
+    confirms immediately with no payment step — the response's `status`
+    tells the frontend whether to skip straight to "done".
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = PublicVendorRegistrationCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        registration = create_vendor_registration(**serializer.to_registration_kwargs())
+
+        return Response(
+            {
+                "registrationId": registration.id,
+                "reference": registration.registration_number,
+                "amount": float(registration.amount),
+                "currency": registration.currency,
+                "status": registration.status,
             },
             status=status.HTTP_201_CREATED,
         )

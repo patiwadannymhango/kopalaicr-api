@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import transaction
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration
+from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration, VendorRegistration
 
 
 @transaction.atomic
@@ -93,3 +93,47 @@ def create_team_registration(
     team.notify_received()
 
     return team
+
+
+@transaction.atomic
+def create_vendor_registration(
+    *,
+    category,
+    business_name,
+    contact_person,
+    contact_email,
+    contact_phone,
+    business_location,
+    products_services,
+    requirement,
+    accepted_terms,
+):
+    """
+    Create the vendor's registration. A free category (e.g. Official
+    Sponsor, price 0) confirms immediately — there's no payment step to
+    wait on, so this jumps straight to CONFIRMED and sends the
+    "confirmed" notification instead of "received" (matches the frontend's
+    submitVendorRegistration/status check).
+    """
+
+    registration = VendorRegistration.objects.create(
+        category=category,
+        business_name=business_name,
+        contact_person=contact_person,
+        contact_email=contact_email.lower(),
+        contact_phone=contact_phone,
+        business_location=business_location,
+        products_services=products_services,
+        requirement=requirement,
+        accepted_terms=accepted_terms,
+        amount=category.price,
+        currency=category.currency,
+    )
+
+    if category.price <= 0:
+        registration.confirm_payment()
+        registration.notify_confirmed()
+    else:
+        registration.notify_received()
+
+    return registration

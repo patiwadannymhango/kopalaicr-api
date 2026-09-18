@@ -7,12 +7,19 @@ from .gateways.base import get_gateway
 from .models import Payment
 
 
-def create_payment(*, target, payment_method):
-    from apps.registrations.models import IndividualRegistration, TeamRegistration
+def _target_fields(target):
+    from apps.registrations.models import IndividualRegistration, TeamRegistration, VendorRegistration
 
+    return {
+        "individual_registration": target if isinstance(target, IndividualRegistration) else None,
+        "team_registration": target if isinstance(target, TeamRegistration) else None,
+        "vendor_registration": target if isinstance(target, VendorRegistration) else None,
+    }
+
+
+def create_payment(*, target, payment_method):
     return Payment.objects.create(
-        individual_registration=target if isinstance(target, IndividualRegistration) else None,
-        team_registration=target if isinstance(target, TeamRegistration) else None,
+        **_target_fields(target),
         reference=f"PAY-{uuid.uuid4().hex[:16].upper()}",
         amount=target.amount,
         currency=target.currency,
@@ -33,11 +40,8 @@ def create_admin_cash_payment(*, target, payment_method="CASH"):
     a registration took to CONFIRMED: it's always backed by exactly one
     SUCCESS Payment.
     """
-    from apps.registrations.models import IndividualRegistration, TeamRegistration
-
     return Payment.objects.create(
-        individual_registration=target if isinstance(target, IndividualRegistration) else None,
-        team_registration=target if isinstance(target, TeamRegistration) else None,
+        **_target_fields(target),
         reference=f"PAY-{uuid.uuid4().hex[:16].upper()}",
         amount=target.amount,
         currency=target.currency,

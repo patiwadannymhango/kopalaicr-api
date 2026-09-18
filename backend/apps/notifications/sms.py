@@ -54,11 +54,12 @@ BACKENDS = {
 def send_sms(*, to, message, target=None, notification_type=Notification.NotificationType.CUSTOM):
     from django.conf import settings
 
-    from apps.registrations.models import IndividualRegistration, TeamRegistration
+    from apps.registrations.models import IndividualRegistration, TeamRegistration, VendorRegistration
 
     notification = Notification.objects.create(
         individual_registration=target if isinstance(target, IndividualRegistration) else None,
         team_registration=target if isinstance(target, TeamRegistration) else None,
+        vendor_registration=target if isinstance(target, VendorRegistration) else None,
         channel=Notification.Channel.SMS,
         notification_type=notification_type,
         recipient=to,

@@ -21,9 +21,9 @@ class Payment(UUIDModel):
         CANCELLED = "CANCELLED", "Cancelled"
         REFUNDED = "REFUNDED", "Refunded"
 
-    # Exactly one of these two is set — see the constraint below. Two
-    # nullable FKs rather than a GenericForeignKey: there are only ever two
-    # kinds of payment target, so contenttypes machinery would be more
+    # Exactly one of these three is set — see the constraint below. Nullable
+    # FKs rather than a GenericForeignKey: there are only ever a few kinds
+    # of payment target, so contenttypes machinery would be more
     # abstraction than the problem needs. `target` gives the
     # gateway/webhook/notification code a single thing to call regardless
     # of which one is set.
@@ -36,6 +36,9 @@ class Payment(UUIDModel):
     )
     team_registration = models.ForeignKey(
         "registrations.TeamRegistration", on_delete=models.PROTECT, related_name="payments", null=True, blank=True
+    )
+    vendor_registration = models.ForeignKey(
+        "registrations.VendorRegistration", on_delete=models.PROTECT, related_name="payments", null=True, blank=True
     )
 
     reference = models.CharField(max_length=100, unique=True, db_index=True)
@@ -61,8 +64,9 @@ class Payment(UUIDModel):
         constraints = [
             models.CheckConstraint(
                 condition=(
-                    models.Q(individual_registration__isnull=False, team_registration__isnull=True)
-                    | models.Q(individual_registration__isnull=True, team_registration__isnull=False)
+                    models.Q(individual_registration__isnull=False, team_registration__isnull=True, vendor_registration__isnull=True)
+                    | models.Q(individual_registration__isnull=True, team_registration__isnull=False, vendor_registration__isnull=True)
+                    | models.Q(individual_registration__isnull=True, team_registration__isnull=True, vendor_registration__isnull=False)
                 ),
                 name="payment_exactly_one_target",
             )
@@ -73,8 +77,8 @@ class Payment(UUIDModel):
 
     @property
     def target(self):
-        """The IndividualRegistration or TeamRegistration this payment is for."""
-        return self.individual_registration or self.team_registration
+        """The IndividualRegistration, TeamRegistration or VendorRegistration this payment is for."""
+        return self.individual_registration or self.team_registration or self.vendor_registration
 
 
 class Withdrawal(UUIDModel):

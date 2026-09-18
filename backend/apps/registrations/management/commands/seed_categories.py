@@ -56,6 +56,34 @@ CATEGORIES = [
         "price": "2.00",
         "description": "One entry fee covers the full 8-runner team, any division.",
     },
+    {
+        "code": "exhibition-stall",
+        "name": "Exhibition Stall",
+        "entry_type": Category.EntryType.VENDOR,
+        "price": "2.00",
+        "description": "General exhibition space at the event.",
+    },
+    {
+        "code": "food-beverage-stall",
+        "name": "Food & Beverage Stall",
+        "entry_type": Category.EntryType.VENDOR,
+        "price": "2.00",
+        "description": "For vendors selling food or drinks on race day.",
+    },
+    {
+        "code": "corporate-activation",
+        "name": "Corporate Activation",
+        "entry_type": Category.EntryType.VENDOR,
+        "price": "2.00",
+        "description": "Branded activation space for a company to engage attendees.",
+    },
+    {
+        "code": "official-sponsor",
+        "name": "Official Sponsor",
+        "entry_type": Category.EntryType.VENDOR,
+        "price": "0.00",
+        "description": "Complimentary category for confirmed sponsors — no payment step, confirmed immediately.",
+    },
 ]
 
 

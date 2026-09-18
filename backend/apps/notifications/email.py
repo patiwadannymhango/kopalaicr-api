@@ -15,11 +15,12 @@ from .models import Notification
 
 
 def send_email(*, to, subject, text_body, html_body=None, target=None, notification_type=Notification.NotificationType.CUSTOM):
-    from apps.registrations.models import IndividualRegistration, TeamRegistration
+    from apps.registrations.models import IndividualRegistration, TeamRegistration, VendorRegistration
 
     notification = Notification.objects.create(
         individual_registration=target if isinstance(target, IndividualRegistration) else None,
         team_registration=target if isinstance(target, TeamRegistration) else None,
+        vendor_registration=target if isinstance(target, VendorRegistration) else None,
         channel=Notification.Channel.EMAIL,
         notification_type=notification_type,
         recipient=to,

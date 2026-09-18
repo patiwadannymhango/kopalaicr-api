@@ -15,6 +15,7 @@ class Category(UUIDModel):
     class EntryType(models.TextChoices):
         INDIVIDUAL = "INDIVIDUAL", "Individual"
         TEAM = "TEAM", "Team"
+        VENDOR = "VENDOR", "Vendor"
 
     name = models.CharField(max_length=150)
     code = models.SlugField(max_length=100, unique=True)
@@ -217,3 +218,72 @@ class RosterRunner(UUIDModel):
 
     def __str__(self):
         return self.full_name
+
+
+class VendorRegistration(BaseRegistration):
+    """
+    A business's stall/exhibition/activation entry for the event —
+    entirely separate from runners: one business, one contact, no
+    roster. Like TeamRegistration, the registrant's contact details live
+    directly on this model rather than through a shared Participant, since
+    there's exactly one accountable contact per business.
+    """
+
+    class Requirement(models.TextChoices):
+        EXHIBITION_SPACE = "exhibition-space", "Exhibition Space"
+        VENDOR_STALL = "vendor-stall", "Vendor Stall"
+        FOOD_BEVERAGE_STALL = "food-beverage-stall", "Food & Beverage Stall"
+        CORPORATE_ACTIVATION = "corporate-activation", "Corporate Activation"
+        BRANDING_PROMOTIONAL = "branding-promotional", "Branding / Promotional Space"
+        OTHER = "other", "Other"
+
+    REFERENCE_PREFIX = "KICRV"
+
+    category = models.ForeignKey(
+        Category, on_delete=models.PROTECT, related_name="vendor_registrations",
+        limit_choices_to={"entry_type": Category.EntryType.VENDOR},
+    )
+    business_name = models.CharField(max_length=200)
+    contact_person = models.CharField(max_length=200)
+    contact_email = models.EmailField(db_index=True)
+    contact_phone = models.CharField(max_length=30)
+    business_location = models.CharField(max_length=200, blank=True)
+    products_services = models.TextField(blank=True)
+    requirement = models.CharField(max_length=30, choices=Requirement.choices, blank=True)
+    accepted_terms = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-registered_at"]
+
+    # --- Gateway-facing contact interface (mirrors Participant/TeamRegistration) ---
+
+    @property
+    def full_name(self):
+        return self.contact_person
+
+    @property
+    def email(self):
+        return self.contact_email
+
+    @property
+    def phone(self):
+        return self.contact_phone
+
+    @property
+    def contact(self):
+        return self
+
+    def notify_received(self):
+        from apps.notifications.services import notify_vendor_registration_received
+
+        notify_vendor_registration_received(self)
+
+    def notify_confirmed(self):
+        from apps.notifications.services import notify_vendor_payment_confirmed
+
+        notify_vendor_payment_confirmed(self)
+
+    def notify_failed(self, *, reason=""):
+        from apps.notifications.services import notify_vendor_payment_failed
+
+        notify_vendor_payment_failed(self, reason=reason)

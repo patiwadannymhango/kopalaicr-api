@@ -12,6 +12,7 @@ class NotificationAdmin(admin.ModelAdmin):
         "status",
         "individual_registration",
         "team_registration",
+        "vendor_registration",
         "created_at",
     )
     list_filter = ("channel", "notification_type", "status")
@@ -19,10 +20,12 @@ class NotificationAdmin(admin.ModelAdmin):
         "recipient",
         "individual_registration__registration_number",
         "team_registration__registration_number",
+        "vendor_registration__registration_number",
     )
     readonly_fields = (
         "individual_registration",
         "team_registration",
+        "vendor_registration",
         "channel",
         "notification_type",
         "recipient",
