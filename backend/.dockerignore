@@ -1,0 +1,21 @@
+# Never bake real secrets into the image — env vars are injected at
+# container start via docker-compose's env_file instead (see
+# docker-compose.yml / docker-compose.prod.yml). Without this, a stale
+# .env baked into an old image layer silently wins over the real runtime
+# environment for any key python-decouple can't find in os.environ,
+# since decouple falls back to reading a .env file it finds on disk.
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+staticfiles/
+media/
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
