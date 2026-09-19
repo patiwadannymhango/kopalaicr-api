@@ -13,3 +13,15 @@ class IsStaffRole(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.is_staff)
+
+
+class IsSuperuserRole(BasePermission):
+    """
+    Gate for admin-user-management endpoints (apps.accounts admin/*
+    views) — creating, editing or deactivating other staff accounts is
+    more sensitive than the rest of the IsStaffRole-gated dashboard, so
+    it's restricted to superusers only.
+    """
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
