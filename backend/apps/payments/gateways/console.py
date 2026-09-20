@@ -39,3 +39,6 @@ class ConsoleGateway:
             return {"status": "SUCCESS", "raw": {"backend": "console", "elapsed_seconds": elapsed}}
 
         return {"status": "PROCESSING", "raw": {"backend": "console", "elapsed_seconds": elapsed}}
+
+    def get_balance(self):
+        raise NotImplementedError("The console gateway has no real merchant balance to report.")

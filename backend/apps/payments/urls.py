@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AdminWalletBalanceView,
     AdminWithdrawalListCreateView,
     InitiatePaymentView,
     LipilaWebhookView,
@@ -14,4 +15,5 @@ urlpatterns = [
     path("<uuid:payment_id>/status/", PublicPaymentStatusView.as_view(), name="payments-status"),
     path("webhooks/lipila/", LipilaWebhookView.as_view(), name="payments-webhook-lipila"),
     path("admin/withdrawals/", AdminWithdrawalListCreateView.as_view(), name="admin-withdrawals"),
+    path("admin/wallet-balance/", AdminWalletBalanceView.as_view(), name="admin-wallet-balance"),
 ]

@@ -81,3 +81,10 @@ class LipilaGateway:
         )
 
         return {"status": (response.get("status") or "").upper(), "raw": response}
+
+    def get_balance(self):
+        """Fetch the merchant account's current float balance. Endpoint
+        path is configurable via settings.LIPILA_BALANCE_ENDPOINT —
+        confirm against your Lipila dashboard if it ever changes."""
+
+        return self.client.request("GET", settings.LIPILA_BALANCE_ENDPOINT)

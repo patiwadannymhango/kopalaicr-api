@@ -251,6 +251,9 @@ LIPILA_PRODUCTION_BASE_URL = config("LIPILA_PRODUCTION_BASE_URL", default="https
 LIPILA_SANDBOX_API_KEY = config("LIPILA_SANDBOX_API_KEY", default="")
 LIPILA_PRODUCTION_API_KEY = config("LIPILA_PRODUCTION_API_KEY", default="")
 LIPILA_WEBHOOK_SECRET = config("LIPILA_WEBHOOK_SECRET", default="")
+# Merchant float balance — path only, confirm against your Lipila
+# dashboard/docs if it 404s (see LipilaGateway.get_balance()).
+LIPILA_BALANCE_ENDPOINT = config("LIPILA_BALANCE_ENDPOINT", default="/api/v1/merchants/balance")
 
 
 # ---------------------------------------------------------------------------

@@ -282,3 +282,28 @@ class AdminWithdrawalListCreateView(ListAPIView):
         )
 
         return Response(AdminWithdrawalSerializer(withdrawal).data, status=status.HTTP_201_CREATED)
+
+
+class AdminWalletBalanceView(APIView):
+    """
+    GET /api/v1/payments/admin/wallet-balance/
+
+    The real merchant float balance sitting at the payment gateway right
+    now — distinct from "Cash Withdrawn"/"Cash Available" above, which
+    are this app's own ledger of registrations collected vs. cash
+    admins have physically taken out. Only meaningful when
+    PAYMENT_GATEWAY=lipila; the console gateway (local dev) has no real
+    balance, so this always reports an error in that case rather than
+    fabricating a number.
+    """
+
+    permission_classes = [IsAuthenticated, IsStaffRole]
+
+    def get(self, request):
+        from .gateways.base import get_gateway
+
+        try:
+            live_balance = get_gateway().get_balance()
+            return Response({"live_balance": live_balance, "live_balance_error": None})
+        except Exception as exc:  # noqa: BLE001 — surface any failure reason, never 500 the dashboard
+            return Response({"live_balance": None, "live_balance_error": str(exc)})
