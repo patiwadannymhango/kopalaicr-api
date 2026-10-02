@@ -373,7 +373,6 @@ class AdminIndividualBulkUploadTemplateView(APIView):
         "gender",
         "age_range",
         "country",
-        "t_shirt_size",
         "division",
         "town_or_city",
         "club_or_institution",
@@ -457,7 +456,6 @@ class AdminIndividualBulkUploadView(APIView):
                         "country": row.get("country", ""),
                     },
                     details={
-                        "t_shirt_size": row.get("t_shirt_size", ""),
                         "division": row.get("division", ""),
                         "town_or_city": row.get("town_or_city", ""),
                         "club_or_institution": row.get("club_or_institution", ""),
@@ -525,7 +523,6 @@ class AdminIndividualExportView(APIView):
         ("Gender", lambda r: r.participant.gender),
         ("Age range", lambda r: r.participant.age_range),
         ("Category", lambda r: r.category.name),
-        ("T-shirt size", lambda r: r.t_shirt_size),
         ("Division", lambda r: r.division),
         ("Town/City", lambda r: r.town_or_city),
         ("Club/Institution", lambda r: r.club_or_institution),

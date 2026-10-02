@@ -34,7 +34,6 @@ class IndividualDetailsSerializer(serializers.Serializer):
     gender = serializers.CharField(source="participant.gender")
     ageRange = serializers.CharField(source="participant.age_range")
     country = serializers.CharField(source="participant.country")
-    tShirtSize = serializers.CharField(source="t_shirt_size")
     raceCategory = serializers.CharField(source="category.code")
     division = serializers.CharField()
     townOrCity = serializers.CharField(source="town_or_city")
@@ -52,7 +51,6 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
     ageRange = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     country = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    tShirtSize = serializers.ChoiceField(choices=IndividualRegistration.TShirtSize.choices, required=False, allow_blank=True)
     raceCategory = serializers.CharField()
     division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
     townOrCity = serializers.CharField(max_length=150, required=False, allow_blank=True)
@@ -112,7 +110,6 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
                 "country": data.get("country", ""),
             },
             "details": {
-                "t_shirt_size": data.get("tShirtSize", ""),
                 "division": data.get("division", ""),
                 "town_or_city": data.get("townOrCity", ""),
                 "club_or_institution": data.get("clubOrInstitution", ""),
@@ -339,7 +336,6 @@ class AdminIndividualRegistrationSerializer(serializers.ModelSerializer):
             "category",
             "category_name",
             "category_code",
-            "t_shirt_size",
             "division",
             "town_or_city",
             "club_or_institution",
@@ -366,9 +362,6 @@ class AdminIndividualRegistrationUpdateSerializer(serializers.Serializer):
     age_range = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     country = serializers.CharField(required=False, allow_blank=True, max_length=100)
 
-    t_shirt_size = serializers.ChoiceField(
-        choices=IndividualRegistration.TShirtSize.choices, required=False, allow_blank=True
-    )
     division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
     town_or_city = serializers.CharField(required=False, allow_blank=True, max_length=150)
     club_or_institution = serializers.CharField(required=False, allow_blank=True, max_length=200)
@@ -393,9 +386,6 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
     age_range = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     country = serializers.CharField(required=False, allow_blank=True, max_length=100)
-    t_shirt_size = serializers.ChoiceField(
-        choices=IndividualRegistration.TShirtSize.choices, required=False, allow_blank=True
-    )
     division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
     town_or_city = serializers.CharField(required=False, allow_blank=True, max_length=150)
     club_or_institution = serializers.CharField(required=False, allow_blank=True, max_length=200)
@@ -420,7 +410,6 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
                 "country": data.get("country", ""),
             },
             "details": {
-                "t_shirt_size": data.get("t_shirt_size", ""),
                 "division": data.get("division", ""),
                 "town_or_city": data.get("town_or_city", ""),
                 "club_or_institution": data.get("club_or_institution", ""),

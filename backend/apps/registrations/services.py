@@ -34,7 +34,6 @@ def create_individual_registration(
         status=status,
         amount=category.price,
         currency=category.currency,
-        t_shirt_size=details.get("t_shirt_size", ""),
         division=details.get("division", ""),
         town_or_city=details.get("town_or_city", ""),
         club_or_institution=details.get("club_or_institution", ""),

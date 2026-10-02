@@ -59,17 +59,6 @@ class Participant(UUIDModel):
 
 
 class IndividualRegistration(BaseRegistration):
-    class TShirtSize(models.TextChoices):
-        XS = "XS", "XS"
-        S = "S", "S"
-        M = "M", "M"
-        L = "L", "L"
-        XL = "XL", "XL"
-        XXL = "XXL", "XXL"
-        XXXL = "3XL", "3XL"
-        XXXXL = "4XL", "4XL"
-        XXXXXL = "5XL", "5XL"
-
     class Division(models.TextChoices):
         MENS_OPEN = "mens-open", "Men's Open"
         WOMENS_OPEN = "womens-open", "Women's Open"
@@ -84,7 +73,6 @@ class IndividualRegistration(BaseRegistration):
         limit_choices_to={"entry_type": Category.EntryType.INDIVIDUAL},
     )
 
-    t_shirt_size = models.CharField(max_length=10, choices=TShirtSize.choices, blank=True)
     # Only meaningful for the 5KM, 10KM and 21KM Individual races — the
     # 100m CEO/Directors races and Kids Athletics have none (matches
     # INDIVIDUAL_DIVISIONS in the frontend's src/types.ts and
