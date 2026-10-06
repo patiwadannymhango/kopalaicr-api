@@ -147,6 +147,11 @@ class TeamRegistration(BaseRegistration):
     captain_email = models.EmailField(db_index=True)
     captain_phone = models.CharField(max_length=30)
 
+    # How many people the captain says will actually run — collected at
+    # registration since there's no named roster to count at that point
+    # (see RosterRunner's docstring). Nullable so existing teams registered
+    # before this field existed don't need a backfill.
+    participant_count = models.PositiveIntegerField(null=True, blank=True)
     free_runner_limit = models.PositiveIntegerField()
     accepted_terms = models.BooleanField(default=False)
 
