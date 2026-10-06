@@ -119,13 +119,21 @@ def create_team_registration(
     captain_phone,
     roster,
     accepted_terms,
+    category=None,
     participant_count=None,
 ):
     """
     Create the team's base entry registration and its roster in one call.
+
+    `category` is the priced TEAM Category the group is entering (5KM/10KM/
+    21KM Corporate Relay, 100M CEO/Directors, Kids Athletics — all K10,000).
+    Defaults to the original single "relay" (10KM Corporate Relay) category
+    when not given, since the admin's manual "Add team" flow has no race
+    picker of its own yet.
     """
 
-    category = Category.objects.get(code="relay", entry_type=Category.EntryType.TEAM, is_active=True)
+    if category is None:
+        category = Category.objects.get(code="relay", entry_type=Category.EntryType.TEAM, is_active=True)
 
     team = TeamRegistration.objects.create(
         category=category,

@@ -268,7 +268,7 @@ class RunnerRosterEntrySerializer(serializers.Serializer):
 class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     teamName = serializers.CharField(max_length=200)
     companyOrInstitution = serializers.CharField(max_length=200)
-    relayCategory = serializers.ChoiceField(choices=TeamRegistration.RelayCategory.choices)
+    raceCategory = serializers.CharField()
     captainFirstName = serializers.CharField(max_length=150)
     captainLastName = serializers.CharField(max_length=150)
     captainEmail = serializers.EmailField()
@@ -281,6 +281,12 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("You must accept the terms and conditions.")
         return value
+
+    def validate_raceCategory(self, value):
+        try:
+            return Category.objects.get(code=value, entry_type=Category.EntryType.TEAM, is_active=True)
+        except Category.DoesNotExist:
+            raise serializers.ValidationError("Invalid race category.")
 
     def validate_roster(self, value):
         from django.conf import settings
@@ -296,7 +302,12 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
         return {
             "team_name": data["teamName"],
             "company_or_institution": data["companyOrInstitution"],
-            "relay_category": data["relayCategory"],
+            "category": data["raceCategory"],
+            # The public form only asks which race the group is entering —
+            # the Men's/Women's/Mixed division tag is a separate, admin-only
+            # concept (see TeamRegistration.relay_category) that no longer
+            # has a public input, so every new group defaults to Mixed.
+            "relay_category": TeamRegistration.RelayCategory.MIXED_TEAM,
             "captain_first_name": data["captainFirstName"],
             "captain_last_name": data["captainLastName"],
             "captain_email": data["captainEmail"],
@@ -408,6 +419,8 @@ def serialize_team_record(team):
         "details": {
             "teamName": team.team_name,
             "companyOrInstitution": team.company_or_institution,
+            "raceCategory": team.category.code,
+            "raceCategoryName": team.category.name,
             "relayCategory": team.relay_category,
             "captainFirstName": team.captain_first_name,
             "captainLastName": team.captain_last_name,

@@ -196,10 +196,10 @@ class TeamRegistration(BaseRegistration):
     team_name = models.CharField(max_length=200)
     company_or_institution = models.CharField(max_length=200)
     # Which division the team competes in — display-only, not a pricing
-    # key. Every relay team pays the same one `category` (code="relay")
-    # regardless of this value; see the frontend's own comment in
-    # TeamRegistration.tsx about looking the fee up by category code
-    # rather than by this field.
+    # key (pricing comes from `category`, which picks the actual race —
+    # 5KM/10KM/21KM Corporate Relay, 100M CEO/Directors, Kids Athletics).
+    # Admin-only: the public form has no input for this and every new
+    # group defaults to Mixed (see PublicTeamRegistrationCreateSerializer).
     relay_category = models.CharField(max_length=20, choices=RelayCategory.choices)
 
     captain_first_name = models.CharField(max_length=150)

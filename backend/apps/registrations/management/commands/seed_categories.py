@@ -6,7 +6,8 @@ from apps.registrations.models import Category
 # KOPALA Inter-Company Relay 2026). Only used to seed a category the
 # first time it's created (see the command's create-only behaviour
 # below) — an existing production DB gets these via the
-# 0006_set_real_category_prices data migration instead.
+# 0006_set_real_category_prices / 0011_add_team_race_categories data
+# migrations instead.
 CATEGORIES = [
     {
         "code": "5km-individual",
@@ -52,10 +53,45 @@ CATEGORIES = [
     },
     {
         "code": "relay",
-        "name": "10KM Corporate Relay — Team Entry",
+        "name": "10KM Corporate Relay",
         "entry_type": Category.EntryType.TEAM,
         "price": "10000.00",
-        "description": "One entry fee covers the full 8-runner team, any division.",
+        "description": "One entry fee covers the full group, any division.",
+    },
+    {
+        "code": "5km-corporate-relay",
+        "name": "5KM Corporate Relay",
+        "entry_type": Category.EntryType.TEAM,
+        "price": "10000.00",
+        "description": "One entry fee covers the full group, any division.",
+    },
+    {
+        "code": "21km-corporate-relay",
+        "name": "21KM Corporate Relay",
+        "entry_type": Category.EntryType.TEAM,
+        "price": "10000.00",
+        "description": "One entry fee covers the full group, any division.",
+    },
+    {
+        "code": "100m-ceo-relay",
+        "name": "100M CEO Race",
+        "entry_type": Category.EntryType.TEAM,
+        "price": "10000.00",
+        "description": "Group entry for the CEO sprint.",
+    },
+    {
+        "code": "100m-directors-relay",
+        "name": "100M Directors Race",
+        "entry_type": Category.EntryType.TEAM,
+        "price": "10000.00",
+        "description": "Group entry for the Directors sprint.",
+    },
+    {
+        "code": "kids-athletics-relay",
+        "name": "KIDS Athletics",
+        "entry_type": Category.EntryType.TEAM,
+        "price": "10000.00",
+        "description": "Group entry for Kids Athletics.",
     },
     {
         "code": "exhibition-stall",

@@ -235,9 +235,9 @@ class PublicIndividualBatchTemplateView(APIView):
 
 
 class PublicTeamCategoryListView(APIView):
-    """GET /api/v1/registrations/team/categories/ — returns the one
-    code="relay" row; the frontend looks it up by that code specifically
-    (one fee covers the whole 8-runner team regardless of division)."""
+    """GET /api/v1/registrations/team/categories/ — every priced group/
+    relay race (5KM/10KM/21KM Corporate Relay, 100M CEO/Directors, Kids
+    Athletics), each a flat per-group fee regardless of headcount."""
 
     permission_classes = [AllowAny]
 
@@ -352,10 +352,10 @@ class PublicRegistrationLookupView(APIView):
             return Response(serialize_individual_record(individual))
 
         team = (
-            TeamRegistration.objects.prefetch_related("roster")
+            TeamRegistration.objects.select_related("category").prefetch_related("roster")
             .filter(registration_number__iexact=query)
             .first()
-            or TeamRegistration.objects.prefetch_related("roster")
+            or TeamRegistration.objects.select_related("category").prefetch_related("roster")
             .filter(captain_email__iexact=query)
             .order_by("-registered_at")
             .first()
