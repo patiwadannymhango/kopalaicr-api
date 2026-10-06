@@ -273,6 +273,7 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     captainLastName = serializers.CharField(max_length=150)
     captainEmail = serializers.EmailField()
     captainPhone = serializers.CharField(max_length=30)
+    participantCount = serializers.IntegerField(min_value=1)
     roster = RunnerRosterEntrySerializer(many=True, required=False, default=list)
     acceptedTerms = serializers.BooleanField()
 
@@ -300,6 +301,7 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
             "captain_last_name": data["captainLastName"],
             "captain_email": data["captainEmail"],
             "captain_phone": data["captainPhone"],
+            "participant_count": data["participantCount"],
             "roster": data.get("roster", []),
             "accepted_terms": data["acceptedTerms"],
         }
@@ -411,6 +413,7 @@ def serialize_team_record(team):
             "captainLastName": team.captain_last_name,
             "captainEmail": team.captain_email,
             "captainPhone": team.captain_phone,
+            "participantCount": team.participant_count,
             "roster": [{"fullName": r.full_name, "gender": r.gender} for r in team.roster.all()],
             "acceptedTerms": team.accepted_terms,
         },
@@ -612,6 +615,7 @@ class AdminTeamRegistrationSerializer(serializers.ModelSerializer):
             "captain_last_name",
             "captain_email",
             "captain_phone",
+            "participant_count",
             "free_runner_limit",
             "roster",
             "category",
@@ -635,6 +639,7 @@ class AdminTeamRegistrationUpdateSerializer(serializers.Serializer):
     captain_first_name = serializers.CharField(required=False, max_length=150)
     captain_last_name = serializers.CharField(required=False, max_length=150)
     captain_phone = serializers.CharField(required=False, max_length=30)
+    participant_count = serializers.IntegerField(required=False, min_value=1, allow_null=True)
     status = serializers.ChoiceField(choices=TeamRegistration.Status.choices, required=False)
 
 
@@ -650,6 +655,7 @@ class AdminManualTeamRegistrationSerializer(serializers.Serializer):
     captain_last_name = serializers.CharField(max_length=150)
     captain_email = serializers.EmailField()
     captain_phone = serializers.CharField(max_length=30)
+    participant_count = serializers.IntegerField(required=False, min_value=1, allow_null=True)
     roster = RunnerRosterEntrySerializer(many=True, required=False, default=list)
     status = serializers.ChoiceField(choices=TeamRegistration.Status.choices, default=TeamRegistration.Status.CONFIRMED)
     payment_method = serializers.ChoiceField(choices=PaymentMethod.choices, required=False, default=PaymentMethod.CASH)
@@ -671,6 +677,7 @@ class AdminManualTeamRegistrationSerializer(serializers.Serializer):
             "captain_last_name": data["captain_last_name"],
             "captain_email": data["captain_email"],
             "captain_phone": data["captain_phone"],
+            "participant_count": data.get("participant_count"),
             "roster": data.get("roster", []),
             "accepted_terms": True,
         }
