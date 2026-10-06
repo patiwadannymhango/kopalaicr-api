@@ -721,7 +721,6 @@ class AdminTeamExportView(APIView):
         ("Captain email", lambda r: r.captain_email),
         ("Captain phone", lambda r: r.captain_phone),
         ("Category", lambda r: r.category.name),
-        ("Participants", lambda r: r.participant_count),
         ("Roster size", lambda r: r.roster.count()),
         ("Roster", lambda r: ", ".join(runner.full_name for runner in r.roster.all())),
         ("Amount", lambda r: float(r.amount)),
