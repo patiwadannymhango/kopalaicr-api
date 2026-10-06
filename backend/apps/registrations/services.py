@@ -60,7 +60,6 @@ def create_team_registration(
     captain_phone,
     roster,
     accepted_terms,
-    participant_count=None,
 ):
     """
     Create the team's base entry registration and its roster in one call.
@@ -77,7 +76,6 @@ def create_team_registration(
         captain_last_name=captain_last_name,
         captain_email=captain_email.lower(),
         captain_phone=captain_phone,
-        participant_count=participant_count,
         free_runner_limit=settings.TEAM_FREE_RUNNER_LIMIT,
         accepted_terms=accepted_terms,
         amount=category.price,
