@@ -59,12 +59,6 @@ class Participant(UUIDModel):
 
 
 class IndividualRegistration(BaseRegistration):
-    class Division(models.TextChoices):
-        MENS_OPEN = "mens-open", "Men's Open"
-        WOMENS_OPEN = "womens-open", "Women's Open"
-        CORPORATE = "corporate", "Corporate"
-        MASTERS = "masters", "Masters"
-
     REFERENCE_PREFIX = "KICR"
 
     participant = models.ForeignKey(Participant, on_delete=models.PROTECT, related_name="registrations")
@@ -72,12 +66,13 @@ class IndividualRegistration(BaseRegistration):
         Category, on_delete=models.PROTECT, related_name="individual_registrations",
         limit_choices_to={"entry_type": Category.EntryType.INDIVIDUAL},
     )
+    # Set only when this registration was submitted as part of a group —
+    # see IndividualRegistrationBatch below. Null for a normal standalone
+    # registration.
+    batch = models.ForeignKey(
+        "IndividualRegistrationBatch", on_delete=models.PROTECT, related_name="members", null=True, blank=True
+    )
 
-    # Only meaningful for the 5KM, 10KM and 21KM Individual races — the
-    # 100m CEO/Directors races and Kids Athletics have none (matches
-    # INDIVIDUAL_DIVISIONS in the frontend's src/types.ts and
-    # DIVISION_RACE_CATEGORY_CODES in serializers.py).
-    division = models.CharField(max_length=20, choices=Division.choices, blank=True)
     town_or_city = models.CharField(max_length=150, blank=True)
     club_or_institution = models.CharField(max_length=200, blank=True)
     emergency_contact_name = models.CharField(max_length=200, blank=True)
@@ -109,6 +104,71 @@ class IndividualRegistration(BaseRegistration):
         from apps.notifications.services import notify_individual_payment_failed
 
         notify_individual_payment_failed(self, reason=reason)
+
+
+class IndividualRegistrationBatch(BaseRegistration):
+    """
+    One combined payment covering several IndividualRegistration rows
+    submitted together (the public "register multiple people" flow —
+    manual table entry or an Excel upload). Each member is a completely
+    normal IndividualRegistration (own Participant, own category, own
+    eventual KICR-xxxxx reference) — this only groups them for one
+    Payment and one submitter-facing reference/notification. No single
+    member can stand in as "the" contact for billing/notification
+    purposes, so the submitter gets their own small contact block here.
+    """
+
+    REFERENCE_PREFIX = "KICRG"
+
+    submitted_by_name = models.CharField(max_length=200)
+    submitted_by_email = models.EmailField()
+    submitted_by_phone = models.CharField(max_length=30)
+    accepted_terms = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-registered_at"]
+
+    # --- Gateway-facing contact interface (mirrors Participant) --------
+
+    @property
+    def full_name(self):
+        return self.submitted_by_name
+
+    @property
+    def email(self):
+        return self.submitted_by_email
+
+    @property
+    def phone(self):
+        return self.submitted_by_phone
+
+    @property
+    def contact(self):
+        return self
+
+    def confirm_payment(self):
+        super().confirm_payment()
+        for member in self.members.all():
+            member.confirm_payment()
+
+    def mark_processing(self):
+        super().mark_processing()
+        self.members.update(status=self.Status.PAYMENT_PROCESSING)
+
+    def notify_received(self):
+        from apps.notifications.services import notify_individual_batch_received
+
+        notify_individual_batch_received(self)
+
+    def notify_confirmed(self):
+        from apps.notifications.services import notify_individual_batch_confirmed
+
+        notify_individual_batch_confirmed(self)
+
+    def notify_failed(self, *, reason=""):
+        from apps.notifications.services import notify_individual_batch_failed
+
+        notify_individual_batch_failed(self, reason=reason)
 
 
 class TeamRegistration(BaseRegistration):

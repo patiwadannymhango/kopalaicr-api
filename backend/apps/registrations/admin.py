@@ -2,7 +2,15 @@ from django.contrib import admin
 
 from apps.common.models import BaseRegistration
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration, VendorRegistration
+from .models import (
+    Category,
+    IndividualRegistration,
+    IndividualRegistrationBatch,
+    Participant,
+    RosterRunner,
+    TeamRegistration,
+    VendorRegistration,
+)
 
 
 class ConfirmOnSaveAdminMixin:
@@ -46,6 +54,7 @@ class IndividualRegistrationAdmin(ConfirmOnSaveAdminMixin, admin.ModelAdmin):
         "registration_number",
         "participant",
         "category",
+        "batch",
         "status",
         "amount",
         "currency",
@@ -58,8 +67,39 @@ class IndividualRegistrationAdmin(ConfirmOnSaveAdminMixin, admin.ModelAdmin):
         "participant__email",
         "participant__phone",
     )
-    autocomplete_fields = ("participant", "category")
+    autocomplete_fields = ("participant", "category", "batch")
     readonly_fields = ("registration_number", "registered_at", "updated_at")
+
+
+class IndividualRegistrationInline(admin.TabularInline):
+    """Read-only view of a batch's members — editing an individual
+    member's own fields happens on IndividualRegistrationAdmin itself."""
+
+    model = IndividualRegistration
+    extra = 0
+    fields = ("registration_number", "participant", "category", "status", "amount")
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(IndividualRegistrationBatch)
+class IndividualRegistrationBatchAdmin(ConfirmOnSaveAdminMixin, admin.ModelAdmin):
+    list_display = (
+        "registration_number",
+        "submitted_by_name",
+        "submitted_by_email",
+        "status",
+        "amount",
+        "currency",
+        "registered_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("registration_number", "submitted_by_name", "submitted_by_email", "submitted_by_phone")
+    readonly_fields = ("registration_number", "registered_at", "updated_at")
+    inlines = [IndividualRegistrationInline]
 
 
 class RosterRunnerInline(admin.TabularInline):

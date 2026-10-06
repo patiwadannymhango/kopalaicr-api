@@ -8,10 +8,16 @@ from .models import Payment
 
 
 def _target_fields(target):
-    from apps.registrations.models import IndividualRegistration, TeamRegistration, VendorRegistration
+    from apps.registrations.models import (
+        IndividualRegistration,
+        IndividualRegistrationBatch,
+        TeamRegistration,
+        VendorRegistration,
+    )
 
     return {
         "individual_registration": target if isinstance(target, IndividualRegistration) else None,
+        "individual_registration_batch": target if isinstance(target, IndividualRegistrationBatch) else None,
         "team_registration": target if isinstance(target, TeamRegistration) else None,
         "vendor_registration": target if isinstance(target, VendorRegistration) else None,
     }

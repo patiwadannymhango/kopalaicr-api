@@ -1,7 +1,17 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import transaction
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration, VendorRegistration
+from .models import (
+    Category,
+    IndividualRegistration,
+    IndividualRegistrationBatch,
+    Participant,
+    RosterRunner,
+    TeamRegistration,
+    VendorRegistration,
+)
 
 
 @transaction.atomic
@@ -11,12 +21,18 @@ def create_individual_registration(
     participant_data,
     details,
     status=IndividualRegistration.Status.PENDING_PAYMENT,
+    notify=True,
 ):
     """
     Create the Participant + IndividualRegistration pair. `details` holds
-    the registration-specific fields (t-shirt size, division, club,
-    emergency contact, medical notes, accepted_terms) that live on the
-    registration rather than the participant.
+    the registration-specific fields (club, emergency contact, medical
+    notes, accepted_terms) that live on the registration rather than the
+    participant.
+
+    `notify=False` is used by create_individual_registration_batch()
+    below — a batch member shouldn't get its own "registration received"
+    message before the batch has even been paid for; the submitter gets
+    one summary notification instead (see IndividualRegistrationBatch).
     """
 
     participant = Participant.objects.create(
@@ -34,7 +50,6 @@ def create_individual_registration(
         status=status,
         amount=category.price,
         currency=category.currency,
-        division=details.get("division", ""),
         town_or_city=details.get("town_or_city", ""),
         club_or_institution=details.get("club_or_institution", ""),
         emergency_contact_name=details.get("emergency_contact_name", ""),
@@ -43,9 +58,53 @@ def create_individual_registration(
         accepted_terms=details.get("accepted_terms", False),
     )
 
-    registration.notify_received()
+    if notify:
+        registration.notify_received()
 
     return registration
+
+
+@transaction.atomic
+def create_individual_registration_batch(*, submitted_by, members):
+    """
+    Create several IndividualRegistrations in one go, grouped under one
+    IndividualRegistrationBatch that a single Payment settles. All-or-
+    nothing: the caller (PublicIndividualBatchCreateSerializer) must have
+    already fully validated every member — including a cumulative
+    per-category capacity check across the whole batch — before this
+    runs, so there's no partial-success path to unwind here.
+
+    `members` is a list of dicts shaped like
+    {"category": Category, "participant_data": {...}, "details": {...}}
+    — the same participant_data/details shapes create_individual_registration
+    takes directly.
+    """
+
+    total = sum((m["category"].price for m in members), Decimal("0.00"))
+    currency = members[0]["category"].currency
+
+    batch = IndividualRegistrationBatch.objects.create(
+        submitted_by_name=submitted_by["full_name"],
+        submitted_by_email=submitted_by["email"].lower(),
+        submitted_by_phone=submitted_by["phone"],
+        accepted_terms=True,
+        amount=total,
+        currency=currency,
+    )
+
+    for member in members:
+        registration = create_individual_registration(
+            category=member["category"],
+            participant_data=member["participant_data"],
+            details={**member["details"], "accepted_terms": True},
+            notify=False,
+        )
+        registration.batch = batch
+        registration.save(update_fields=["batch", "updated_at"])
+
+    batch.notify_received()
+
+    return batch
 
 
 @transaction.atomic

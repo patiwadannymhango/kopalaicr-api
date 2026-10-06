@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from apps.common.models import BaseRegistration
@@ -14,9 +14,12 @@ def compute_dashboard_stats(*, registration_model, payment_field, entry_type):
     how each type gets its own table/filters/export on the admin
     dashboard.
 
-    payment_field is "individual_registration" or "team_registration" —
-    whichever Payment FK is set for this entry type (see
-    apps.payments.models.Payment; exactly one of the two is ever set).
+    payment_field is the Payment FK name (or a list of names) that's set
+    for this entry type's payments (see apps.payments.models.Payment —
+    exactly one FK is ever set per Payment). Individual registrations pay
+    through either "individual_registration" (a standalone entry) or
+    "individual_registration_batch" (a group entry) — both need to count
+    as this entry type's revenue, hence the list form.
 
     Field meanings (see kopalaicr-admin's stat cards):
       revenue_confirmed — actually collected: Sum of SUCCESS payments.
@@ -43,7 +46,12 @@ def compute_dashboard_stats(*, registration_model, payment_field, entry_type):
     by_status = list(registrations.values("status").annotate(count=Count("id")))
     today_count = registrations.filter(registered_at__date=today).count()
 
-    payments = Payment.objects.filter(**{f"{payment_field}__isnull": False}, status=Payment.Status.SUCCESS)
+    fields = [payment_field] if isinstance(payment_field, str) else payment_field
+    target_filter = Q()
+    for field in fields:
+        target_filter |= Q(**{f"{field}__isnull": False})
+
+    payments = Payment.objects.filter(target_filter, status=Payment.Status.SUCCESS)
 
     revenue_confirmed = payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     revenue_today = payments.filter(paid_at__date=today).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")

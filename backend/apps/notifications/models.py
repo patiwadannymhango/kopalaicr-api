@@ -26,6 +26,13 @@ class Notification(UUIDModel):
         blank=True,
         related_name="notifications",
     )
+    individual_registration_batch = models.ForeignKey(
+        "registrations.IndividualRegistrationBatch",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
     team_registration = models.ForeignKey(
         "registrations.TeamRegistration",
         on_delete=models.CASCADE,

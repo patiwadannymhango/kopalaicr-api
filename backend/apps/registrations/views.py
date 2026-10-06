@@ -1,7 +1,7 @@
-import csv
 import io
 
 import openpyxl
+from django.conf import settings
 from django.http import HttpResponse
 from openpyxl.utils import get_column_letter
 from rest_framework import filters, status
@@ -9,13 +9,14 @@ from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from apps.common.permissions import IsStaffRole
 from apps.payments.services import create_admin_cash_payment
 
 from .admin_dashboard import compute_dashboard_stats
-from .models import Category, IndividualRegistration, Participant, TeamRegistration
+from .models import Category, IndividualRegistration, IndividualRegistrationBatch, Participant, TeamRegistration
 from .serializers import (
     AdminIndividualRegistrationSerializer,
     AdminIndividualRegistrationUpdateSerializer,
@@ -24,13 +25,22 @@ from .serializers import (
     AdminTeamRegistrationSerializer,
     AdminTeamRegistrationUpdateSerializer,
     CategorySerializer,
+    PublicIndividualBatchCreateSerializer,
+    PublicIndividualBatchMemberSerializer,
     PublicIndividualRegistrationCreateSerializer,
     PublicTeamRegistrationCreateSerializer,
     PublicVendorRegistrationCreateSerializer,
+    serialize_individual_batch_record,
     serialize_individual_record,
     serialize_team_record,
 )
-from .services import create_individual_registration, create_team_registration, create_vendor_registration
+from .services import (
+    create_individual_registration,
+    create_individual_registration_batch,
+    create_team_registration,
+    create_vendor_registration,
+)
+from .xlsx_utils import parse_rows
 
 # ---------------------------------------------------------------------------
 # Individual registration
@@ -69,6 +79,154 @@ class PublicIndividualRegistrationCreateView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class IndividualBatchThrottle(AnonRateThrottle):
+    """
+    Scoped throttle for the two batch endpoints that do meaningfully more
+    work per request than anything else in this public API (up to
+    INDIVIDUAL_BATCH_MAX_ROWS DB writes, or parsing an arbitrary uploaded
+    file) — nothing else here is throttled today, but these two earn it.
+    Rate is set in REST_FRAMEWORK.DEFAULT_THROTTLE_RATES under the
+    "individual_batch" scope.
+    """
+
+    scope = "individual_batch"
+
+
+class PublicIndividualBatchCreateView(APIView):
+    """
+    POST /api/v1/registrations/individual/batch/
+
+    Registers several people in one request under one
+    IndividualRegistrationBatch, returning the same
+    {registrationId, reference, amount, currency} shape as the
+    single-person endpoint above so the existing payment flow
+    (initiate/poll/confirm) works against it unchanged — registrationId
+    here is the batch's id, and paying it off confirms every member.
+    All-or-nothing: validation (including a cumulative per-category
+    capacity check — see the serializer) must fully pass before anything
+    is created.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [IndividualBatchThrottle]
+
+    def post(self, request):
+        serializer = PublicIndividualBatchCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        batch = create_individual_registration_batch(**serializer.to_batch_kwargs())
+
+        return Response(
+            {
+                "registrationId": batch.id,
+                "reference": batch.registration_number,
+                "amount": float(batch.amount),
+                "currency": batch.currency,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PublicIndividualBatchParseView(APIView):
+    """
+    POST /api/v1/registrations/individual/batch/parse/
+
+    Parses an uploaded CSV/XLSX into the same row shape the group
+    registration table edits directly, running each row through
+    PublicIndividualBatchMemberSerializer so the frontend can show
+    per-row errors before the user ever submits. This is a best-effort
+    preview only — rows can be hand-edited afterward, so everything gets
+    fully re-validated again (including capacity) at actual submit time
+    regardless.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [IndividualBatchThrottle]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        upload = request.FILES.get("file")
+        if not upload:
+            return Response({"detail": "Attach a file under the 'file' field."}, status=status.HTTP_400_BAD_REQUEST)
+
+        raw_rows = parse_rows(upload)
+
+        if len(raw_rows) > settings.INDIVIDUAL_BATCH_MAX_ROWS:
+            return Response(
+                {"detail": f"This file has more than {settings.INDIVIDUAL_BATCH_MAX_ROWS} rows — split it up."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        results = []
+        for index, row in enumerate(raw_rows, start=1):
+            camel_row = {
+                "fullName": row.get("full_name", ""),
+                "email": row.get("email", ""),
+                "phone": row.get("phone", ""),
+                "gender": row.get("gender", ""),
+                "ageRange": row.get("age_range", ""),
+                "country": row.get("country", ""),
+                "raceCategory": row.get("category_code", ""),
+                "townOrCity": row.get("town_or_city", ""),
+                "clubOrInstitution": row.get("club_or_institution", ""),
+                "emergencyContactName": row.get("emergency_contact_name", ""),
+                "emergencyContactPhone": row.get("emergency_contact_phone", ""),
+                "medicalNotes": row.get("medical_notes", ""),
+            }
+
+            row_serializer = PublicIndividualBatchMemberSerializer(data=camel_row)
+            if row_serializer.is_valid():
+                values = {**camel_row, "raceCategory": row_serializer.validated_data["raceCategory"].code}
+                results.append({"row": index, "values": values, "errors": None})
+            else:
+                results.append({"row": index, "values": camel_row, "errors": row_serializer.errors})
+
+        return Response({"rows": results})
+
+
+class PublicIndividualBatchTemplateView(APIView):
+    """GET /api/v1/registrations/individual/batch/template/ — public
+    counterpart to the admin's bulk-upload template, same column set
+    minus `status` (every public row starts PENDING_PAYMENT)."""
+
+    permission_classes = [AllowAny]
+
+    COLUMNS = [
+        "full_name",
+        "email",
+        "phone",
+        "category_code",
+        "gender",
+        "age_range",
+        "country",
+        "town_or_city",
+        "club_or_institution",
+        "emergency_contact_name",
+        "emergency_contact_phone",
+        "medical_notes",
+    ]
+
+    def get(self, request):
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Template"
+
+        for col_index, header in enumerate(self.COLUMNS, start=1):
+            sheet.cell(row=1, column=col_index, value=header)
+        for col_index in range(1, len(self.COLUMNS) + 1):
+            sheet.column_dimensions[get_column_letter(col_index)].width = 22
+
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="individual-group-registration-template.xlsx"'
+        return response
 
 
 # ---------------------------------------------------------------------------
@@ -163,8 +321,11 @@ class PublicRegistrationLookupView(APIView):
     """
     GET /api/v1/registrations/lookup/?q=<reference-or-email>
 
-    Searches both individual and team registrations by reference number or
-    email (participant email for an individual, captain email for a team).
+    Searches individual, team and group-batch registrations by reference
+    number or email (participant email for an individual, captain email
+    for a team, submitter email for a batch). A batch member searching by
+    their own email finds their own IndividualRegistration directly via
+    the individual branch below — batch membership doesn't change that.
     """
 
     permission_classes = [AllowAny]
@@ -202,6 +363,15 @@ class PublicRegistrationLookupView(APIView):
         if team:
             return Response(serialize_team_record(team))
 
+        batch = (
+            IndividualRegistrationBatch.objects.filter(registration_number__iexact=query).first()
+            or IndividualRegistrationBatch.objects.filter(submitted_by_email__iexact=query)
+            .order_by("-registered_at")
+            .first()
+        )
+        if batch:
+            return Response(serialize_individual_batch_record(batch))
+
         return Response({"detail": "No matching registration found."}, status=status.HTTP_404_NOT_FOUND)
 
 
@@ -219,7 +389,7 @@ class AdminIndividualDashboardView(APIView):
         return Response(
             compute_dashboard_stats(
                 registration_model=IndividualRegistration,
-                payment_field="individual_registration",
+                payment_field=["individual_registration", "individual_registration_batch"],
                 entry_type="INDIVIDUAL",
             )
         )
@@ -373,7 +543,6 @@ class AdminIndividualBulkUploadTemplateView(APIView):
         "gender",
         "age_range",
         "country",
-        "division",
         "town_or_city",
         "club_or_institution",
         "emergency_contact_name",
@@ -422,7 +591,7 @@ class AdminIndividualBulkUploadView(APIView):
         if not upload:
             return Response({"detail": "Attach a file under the 'file' field."}, status=status.HTTP_400_BAD_REQUEST)
 
-        rows = self._parse_rows(upload)
+        rows = parse_rows(upload)
         categories = {c.code: c for c in Category.objects.filter(entry_type=Category.EntryType.INDIVIDUAL)}
 
         created = []
@@ -456,7 +625,6 @@ class AdminIndividualBulkUploadView(APIView):
                         "country": row.get("country", ""),
                     },
                     details={
-                        "division": row.get("division", ""),
                         "town_or_city": row.get("town_or_city", ""),
                         "club_or_institution": row.get("club_or_institution", ""),
                         "emergency_contact_name": row.get("emergency_contact_name", ""),
@@ -485,29 +653,6 @@ class AdminIndividualBulkUploadView(APIView):
             status=status.HTTP_201_CREATED if created else status.HTTP_400_BAD_REQUEST,
         )
 
-    def _parse_rows(self, upload):
-        filename = (upload.name or "").lower()
-
-        if filename.endswith(".csv"):
-            text = upload.read().decode("utf-8-sig")
-            reader = csv.DictReader(io.StringIO(text))
-            return [{(k or "").strip().lower(): (v or "").strip() for k, v in row.items()} for row in reader]
-
-        workbook = openpyxl.load_workbook(upload, data_only=True)
-        sheet = workbook.active
-
-        rows_iter = sheet.iter_rows(values_only=True)
-        headers = [str(h or "").strip().lower() for h in next(rows_iter)]
-
-        rows = []
-        for values in rows_iter:
-            if all(v in (None, "") for v in values):
-                continue
-            row = {headers[i]: ("" if v is None else str(v).strip()) for i, v in enumerate(values) if i < len(headers)}
-            rows.append(row)
-
-        return rows
-
 
 class AdminIndividualExportView(APIView):
     """GET /api/v1/registrations/admin/individual/registrations/export/ — streams an .xlsx."""
@@ -523,7 +668,6 @@ class AdminIndividualExportView(APIView):
         ("Gender", lambda r: r.participant.gender),
         ("Age range", lambda r: r.participant.age_range),
         ("Category", lambda r: r.category.name),
-        ("Division", lambda r: r.division),
         ("Town/City", lambda r: r.town_or_city),
         ("Club/Institution", lambda r: r.club_or_institution),
         ("Emergency contact", lambda r: r.emergency_contact_name),

@@ -15,6 +15,9 @@ from .views import (
     AdminTeamRegistrationCreateView,
     AdminTeamRegistrationDetailView,
     AdminTeamRegistrationListView,
+    PublicIndividualBatchCreateView,
+    PublicIndividualBatchParseView,
+    PublicIndividualBatchTemplateView,
     PublicIndividualCategoryListView,
     PublicIndividualRegistrationCreateView,
     PublicRegistrationLookupView,
@@ -35,6 +38,21 @@ urlpatterns = [
         "registrations/individual/",
         PublicIndividualRegistrationCreateView.as_view(),
         name="individual-registration-create",
+    ),
+    path(
+        "registrations/individual/batch/",
+        PublicIndividualBatchCreateView.as_view(),
+        name="individual-batch-create",
+    ),
+    path(
+        "registrations/individual/batch/parse/",
+        PublicIndividualBatchParseView.as_view(),
+        name="individual-batch-parse",
+    ),
+    path(
+        "registrations/individual/batch/template/",
+        PublicIndividualBatchTemplateView.as_view(),
+        name="individual-batch-template",
     ),
     # Team — public
     path("registrations/team/categories/", PublicTeamCategoryListView.as_view(), name="team-category-list"),

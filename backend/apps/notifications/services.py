@@ -132,6 +132,95 @@ def notify_individual_payment_failed(registration, *, reason=""):
 
 
 # ---------------------------------------------------------------------------
+# Individual group/batch registrations — the submitter (not each member)
+# gets the "received"/"failed" notices; each member still gets their own
+# normal notify_individual_payment_confirmed() once the batch is paid
+# (see IndividualRegistrationBatch.confirm_payment()), so only the
+# "confirmed" notice here is a one-off summary on top of that.
+# ---------------------------------------------------------------------------
+
+
+def notify_individual_batch_received(batch):
+    member_count = batch.members.count()
+
+    text = (
+        f"Hi {batch.submitted_by_name},\n\n"
+        f"We've received your group registration of {member_count} "
+        f"{'person' if member_count == 1 else 'people'} for {settings.EVENT_NAME}.\n"
+        f"Amount due: {batch.currency} {batch.amount}\n\n"
+        "Complete payment to confirm the group's place — each person will receive their own "
+        "registration reference by email once it's paid.\n"
+    )
+
+    if batch.submitted_by_phone:
+        send_sms(
+            to=batch.submitted_by_phone,
+            message=text,
+            target=batch,
+            notification_type=Notification.NotificationType.REGISTRATION_RECEIVED,
+        )
+
+
+def notify_individual_batch_confirmed(batch):
+    """Each member already gets their own full confirmation (email + SMS,
+    own KICR-xxxxx reference) via IndividualRegistrationBatch.confirm_payment()
+    cascading into each member's own notify_confirmed(). This adds one
+    summary message to the submitter on top of that."""
+
+    members = list(batch.members.select_related("participant"))
+
+    for member in members:
+        member.notify_confirmed()
+
+    subject = f"You're confirmed — {batch.registration_number}"
+    text = (
+        f"Hi {batch.submitted_by_name},\n\n"
+        f"Your group registration for {settings.EVENT_NAME} is confirmed and paid.\n\n"
+        f"Reference: {batch.registration_number}\n"
+        f"People registered: {len(members)}\n"
+        f"Amount paid: {batch.currency} {batch.amount}\n"
+        f"Event date: {settings.EVENT_DATE}\n"
+        f"Venue: {settings.EVENT_LOCATION}\n\n"
+        "Each person's own registration reference has been emailed to them directly.\n\n"
+        "See you at the start line.\n"
+    )
+
+    if batch.submitted_by_email:
+        send_email(
+            to=batch.submitted_by_email,
+            subject=subject,
+            text_body=text,
+            target=batch,
+            notification_type=Notification.NotificationType.PAYMENT_CONFIRMED,
+        )
+
+    if batch.submitted_by_phone:
+        send_sms(
+            to=batch.submitted_by_phone,
+            message=text,
+            target=batch,
+            notification_type=Notification.NotificationType.PAYMENT_CONFIRMED,
+        )
+
+
+def notify_individual_batch_failed(batch, *, reason=""):
+    text = (
+        f"Hi {batch.submitted_by_name},\n\n"
+        f"We couldn't confirm payment for your group registration for "
+        f"{settings.EVENT_NAME}{f' ({reason})' if reason else ''}.\n\n"
+        "Please try again, or contact us for help.\n"
+    )
+
+    if batch.submitted_by_phone:
+        send_sms(
+            to=batch.submitted_by_phone,
+            message=text,
+            target=batch,
+            notification_type=Notification.NotificationType.PAYMENT_FAILED,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Team (relay) registrations — same lifecycle/notification shape as
 # individuals (see module docstring), addressed to the captain, worded
 # around the team entry + dashboard login rather than a single runner.

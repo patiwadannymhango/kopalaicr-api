@@ -2,7 +2,15 @@ from rest_framework import serializers
 
 from apps.payments.models import PaymentMethod
 
-from .models import Category, IndividualRegistration, Participant, RosterRunner, TeamRegistration, VendorRegistration
+from .models import (
+    Category,
+    IndividualRegistration,
+    IndividualRegistrationBatch,
+    Participant,
+    RosterRunner,
+    TeamRegistration,
+    VendorRegistration,
+)
 
 # ---------------------------------------------------------------------------
 # Categories
@@ -35,7 +43,6 @@ class IndividualDetailsSerializer(serializers.Serializer):
     ageRange = serializers.CharField(source="participant.age_range")
     country = serializers.CharField(source="participant.country")
     raceCategory = serializers.CharField(source="category.code")
-    division = serializers.CharField()
     townOrCity = serializers.CharField(source="town_or_city")
     clubOrInstitution = serializers.CharField(source="club_or_institution")
     emergencyContactName = serializers.CharField(source="emergency_contact_name")
@@ -52,7 +59,6 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
     ageRange = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     country = serializers.CharField(max_length=100, required=False, allow_blank=True)
     raceCategory = serializers.CharField()
-    division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
     townOrCity = serializers.CharField(max_length=150, required=False, allow_blank=True)
     clubOrInstitution = serializers.CharField(max_length=200, required=False, allow_blank=True)
     emergencyContactName = serializers.CharField(max_length=200, required=False, allow_blank=True)
@@ -71,16 +77,8 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
         except Category.DoesNotExist:
             raise serializers.ValidationError("Invalid race category.")
 
-    # Races with divisions (Men's Open, Women's Open, Corporate, Masters)
-    # — the 100m CEO/Directors races and Kids Athletics have none. Mirrors
-    # DIVISION_RACE_CATEGORIES in the frontend's IndividualRegistration.tsx.
-    DIVISION_RACE_CATEGORY_CODES = {"5km-individual", "10km-individual", "21km-individual"}
-
     def validate(self, attrs):
         category = attrs["raceCategory"]
-
-        if category.code in self.DIVISION_RACE_CATEGORY_CODES and not attrs.get("division"):
-            raise serializers.ValidationError({"division": "Please choose a division for your race."})
 
         if category.capacity is not None:
             current_count = IndividualRegistration.objects.filter(
@@ -110,7 +108,6 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
                 "country": data.get("country", ""),
             },
             "details": {
-                "division": data.get("division", ""),
                 "town_or_city": data.get("townOrCity", ""),
                 "club_or_institution": data.get("clubOrInstitution", ""),
                 "emergency_contact_name": data.get("emergencyContactName", ""),
@@ -118,6 +115,140 @@ class PublicIndividualRegistrationCreateSerializer(serializers.Serializer):
                 "medical_notes": data.get("medicalNotes", ""),
                 "accepted_terms": data["acceptedTerms"],
             },
+        }
+
+
+# ---------------------------------------------------------------------------
+# Individual registration — group/bulk entry
+# ---------------------------------------------------------------------------
+
+
+class PublicIndividualBatchMemberSerializer(serializers.Serializer):
+    """One row of a group registration — same shape as
+    PublicIndividualRegistrationCreateSerializer minus acceptedTerms
+    (that's collected once, at the batch level)."""
+
+    fullName = serializers.CharField(max_length=200)
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=30)
+    gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
+    ageRange = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
+    country = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    raceCategory = serializers.CharField()
+    townOrCity = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    clubOrInstitution = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    emergencyContactName = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    emergencyContactPhone = serializers.CharField(max_length=30)
+    medicalNotes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_raceCategory(self, value):
+        try:
+            return Category.objects.get(code=value, entry_type=Category.EntryType.INDIVIDUAL, is_active=True)
+        except Category.DoesNotExist:
+            raise serializers.ValidationError("Invalid race category.")
+
+    @staticmethod
+    def row_to_member_kwargs(data):
+        """`data` is one already-validated row dict (as found inside a
+        parent PublicIndividualBatchCreateSerializer's validated_data["rows"])
+        — shaped into the category/participant_data/details kwargs
+        create_individual_registration() expects."""
+        return {
+            "category": data["raceCategory"],
+            "participant_data": {
+                "full_name": data["fullName"],
+                "email": data["email"],
+                "phone": data["phone"],
+                "gender": data.get("gender", ""),
+                "age_range": data.get("ageRange", ""),
+                "country": data.get("country", ""),
+            },
+            "details": {
+                "town_or_city": data.get("townOrCity", ""),
+                "club_or_institution": data.get("clubOrInstitution", ""),
+                "emergency_contact_name": data.get("emergencyContactName", ""),
+                "emergency_contact_phone": data["emergencyContactPhone"],
+                "medical_notes": data.get("medicalNotes", ""),
+            },
+        }
+
+
+class PublicIndividualBatchCreateSerializer(serializers.Serializer):
+    submittedByName = serializers.CharField(max_length=200)
+    submittedByEmail = serializers.EmailField()
+    submittedByPhone = serializers.CharField(max_length=30)
+    rows = PublicIndividualBatchMemberSerializer(many=True)
+    acceptedTerms = serializers.BooleanField()
+
+    def validate_acceptedTerms(self, value):
+        if not value:
+            raise serializers.ValidationError("You must accept the terms and conditions.")
+        return value
+
+    def validate_rows(self, value):
+        from django.conf import settings
+
+        if not value:
+            raise serializers.ValidationError("Add at least one person.")
+        if len(value) > settings.INDIVIDUAL_BATCH_MAX_ROWS:
+            raise serializers.ValidationError(
+                f"Register up to {settings.INDIVIDUAL_BATCH_MAX_ROWS} people per batch."
+            )
+        return value
+
+    def validate(self, attrs):
+        # A cumulative per-category tally across the whole batch, not a
+        # per-row check — validating each row's capacity independently
+        # against the same DB snapshot would let a batch overshoot a
+        # near-full category by up to (batch size - 1) in one request.
+        rows = attrs["rows"]
+        requested = {}
+        category_by_id = {}
+        for row in rows:
+            category = row["raceCategory"]
+            category_by_id[category.id] = category
+            requested[category.id] = requested.get(category.id, 0) + 1
+
+        errors = {}
+        for category_id, count in requested.items():
+            category = category_by_id[category_id]
+            if category.capacity is None:
+                continue
+
+            existing = IndividualRegistration.objects.filter(
+                category=category,
+                status__in=[
+                    IndividualRegistration.Status.PENDING_PAYMENT,
+                    IndividualRegistration.Status.PAYMENT_PROCESSING,
+                    IndividualRegistration.Status.CONFIRMED,
+                ],
+            ).count()
+
+            if existing + count > category.capacity:
+                remaining = max(category.capacity - existing, 0)
+                message = (
+                    f"Only {remaining} spot(s) left in {category.name}; this batch alone requests {count}."
+                )
+                for i, row in enumerate(rows):
+                    if row["raceCategory"].id == category_id:
+                        errors.setdefault(i, {})["raceCategory"] = message
+
+        if errors:
+            raise serializers.ValidationError({"rows": errors})
+
+        return attrs
+
+    def to_batch_kwargs(self):
+        data = self.validated_data
+        return {
+            "submitted_by": {
+                "full_name": data["submittedByName"],
+                "email": data["submittedByEmail"],
+                "phone": data["submittedByPhone"],
+            },
+            "members": [
+                PublicIndividualBatchMemberSerializer.row_to_member_kwargs(row) for row in data["rows"]
+            ],
         }
 
 
@@ -291,6 +422,37 @@ def serialize_team_record(team):
     }
 
 
+def serialize_individual_batch_record(batch):
+    latest_payment = batch.payments.order_by("-created_at").first()
+    members = batch.members.select_related("participant", "category").all()
+
+    return {
+        "reference": batch.registration_number,
+        "entryType": "individual-batch",
+        "details": {
+            "submittedBy": {
+                "fullName": batch.submitted_by_name,
+                "email": batch.submitted_by_email,
+                "phone": batch.submitted_by_phone,
+            },
+            "members": [
+                {
+                    "fullName": m.participant.full_name,
+                    "raceCategory": m.category.code,
+                    "reference": m.registration_number,
+                }
+                for m in members
+            ],
+            "acceptedTerms": batch.accepted_terms,
+        },
+        "payment": _payment_info(latest_payment),
+        "status": _map_status_for_frontend(batch.status, latest_payment.payment_method if latest_payment else None),
+        "submittedAt": batch.registered_at.isoformat(),
+        "amount": float(batch.amount),
+        "currency": batch.currency,
+    }
+
+
 def _payment_info(payment):
     if not payment:
         return {"method": "", "provider": "", "phoneNumber": "", "city": "", "address": "", "zipCode": ""}
@@ -323,6 +485,7 @@ class AdminIndividualRegistrationSerializer(serializers.ModelSerializer):
     participant = AdminParticipantSerializer(read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_code = serializers.CharField(source="category.code", read_only=True)
+    batch_reference = serializers.CharField(source="batch.registration_number", read_only=True, default=None)
 
     class Meta:
         model = IndividualRegistration
@@ -336,7 +499,7 @@ class AdminIndividualRegistrationSerializer(serializers.ModelSerializer):
             "category",
             "category_name",
             "category_code",
-            "division",
+            "batch_reference",
             "town_or_city",
             "club_or_institution",
             "emergency_contact_name",
@@ -362,7 +525,6 @@ class AdminIndividualRegistrationUpdateSerializer(serializers.Serializer):
     age_range = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     country = serializers.CharField(required=False, allow_blank=True, max_length=100)
 
-    division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
     town_or_city = serializers.CharField(required=False, allow_blank=True, max_length=150)
     club_or_institution = serializers.CharField(required=False, allow_blank=True, max_length=200)
     emergency_contact_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
@@ -386,7 +548,6 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
     age_range = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     country = serializers.CharField(required=False, allow_blank=True, max_length=100)
-    division = serializers.ChoiceField(choices=IndividualRegistration.Division.choices, required=False, allow_blank=True)
     town_or_city = serializers.CharField(required=False, allow_blank=True, max_length=150)
     club_or_institution = serializers.CharField(required=False, allow_blank=True, max_length=200)
     emergency_contact_name = serializers.CharField(required=False, allow_blank=True, max_length=200)
@@ -410,7 +571,6 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
                 "country": data.get("country", ""),
             },
             "details": {
-                "division": data.get("division", ""),
                 "town_or_city": data.get("town_or_city", ""),
                 "club_or_institution": data.get("club_or_institution", ""),
                 "emergency_contact_name": data.get("emergency_contact_name", ""),

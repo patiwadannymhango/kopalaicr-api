@@ -170,6 +170,14 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+    # Only the group-registration create/parse endpoints opt into this
+    # (via throttle_classes = [IndividualBatchThrottle]) — nothing else in
+    # the public API is throttled, but those two do meaningfully more
+    # work per request (up to INDIVIDUAL_BATCH_MAX_ROWS DB writes, or
+    # parsing an arbitrary uploaded file) than any other public endpoint.
+    "DEFAULT_THROTTLE_RATES": {
+        "individual_batch": config("INDIVIDUAL_BATCH_THROTTLE_RATE", default="10/hour"),
+    },
 }
 
 CORS_ALLOWED_ORIGINS = config(
@@ -283,3 +291,10 @@ EVENT_LOCATION = config("EVENT_LOCATION", default="Nchanga Stadium, Chingola, Co
 # the team's base entry fee and owe the extra-runner fee instead. Matches
 # RELAY_TEAM_SIZE in the frontend (src/types.ts).
 TEAM_FREE_RUNNER_LIMIT = config("TEAM_FREE_RUNNER_LIMIT", default=8, cast=int)
+
+# Bounds one public group-registration request's DB writes, Excel parse
+# cost, and synchronous notification fan-out. Also matters more than
+# usual here since nothing in this codebase auto-expires abandoned
+# PENDING_PAYMENT rows — this is the worst-case capacity a single
+# abandoned/bad-faith batch submission can squat.
+INDIVIDUAL_BATCH_MAX_ROWS = config("INDIVIDUAL_BATCH_MAX_ROWS", default=50, cast=int)
