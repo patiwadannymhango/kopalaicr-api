@@ -202,10 +202,13 @@ class TeamRegistration(BaseRegistration):
     # group defaults to Mixed (see PublicTeamRegistrationCreateSerializer).
     relay_category = models.CharField(max_length=20, choices=RelayCategory.choices)
 
-    captain_first_name = models.CharField(max_length=150)
-    captain_last_name = models.CharField(max_length=150)
-    captain_email = models.EmailField(db_index=True)
-    captain_phone = models.CharField(max_length=30)
+    # Internal/DB name kept as "captain" — the public-facing label is
+    # "Team Lead" (see PublicTeamRegistrationCreateSerializer), optional
+    # since a team can register without naming an individual contact.
+    captain_first_name = models.CharField(max_length=150, blank=True)
+    captain_last_name = models.CharField(max_length=150, blank=True)
+    captain_email = models.EmailField(db_index=True, blank=True)
+    captain_phone = models.CharField(max_length=30, blank=True)
 
     # How many people the captain says will actually run — collected at
     # registration since there's no named roster to count at that point
