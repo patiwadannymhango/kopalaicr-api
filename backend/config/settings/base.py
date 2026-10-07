@@ -284,7 +284,7 @@ BANK_ACCOUNT_DETAILS = {
 # This event
 # ---------------------------------------------------------------------------
 EVENT_NAME = config("EVENT_NAME", default="Kopala ICR 2026")
-EVENT_DATE = config("EVENT_DATE", default="3 October 2026")
+EVENT_DATE = config("EVENT_DATE", default="Saturday, 17 October 2026")
 EVENT_LOCATION = config("EVENT_LOCATION", default="Nchanga Stadium, Chingola, Copperbelt Province")
 
 # Runners beyond this count on a team's roster are no longer covered by
