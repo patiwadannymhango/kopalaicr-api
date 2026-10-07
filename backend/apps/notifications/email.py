@@ -8,10 +8,18 @@ Every send is logged to the Notification model regardless of success or
 failure, so delivery status per registration is visible in the admin.
 """
 
+from email.mime.image import MIMEImage
+from pathlib import Path
+
 from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
 
 from .models import Notification
+
+# Referenced by every HTML email template as <img src="cid:event-logo">.
+# Attached inline (not linked by URL) so the logo renders even though
+# nothing in this project serves images at a stable public URL yet.
+LOGO_PATH = Path(__file__).resolve().parent / "templates" / "notifications" / "emails" / "assets" / "logo.png"
 
 
 def send_email(*, to, subject, text_body, html_body=None, target=None, notification_type=Notification.NotificationType.CUSTOM):
@@ -40,6 +48,11 @@ def send_email(*, to, subject, text_body, html_body=None, target=None, notificat
 
         if html_body:
             message.attach_alternative(html_body, "text/html")
+            if LOGO_PATH.exists():
+                logo = MIMEImage(LOGO_PATH.read_bytes())
+                logo.add_header("Content-ID", "<event-logo>")
+                logo.add_header("Content-Disposition", "inline", filename="logo.png")
+                message.attach(logo)
 
         message.send(fail_silently=False)
 
