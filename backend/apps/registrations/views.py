@@ -235,14 +235,20 @@ class PublicIndividualBatchTemplateView(APIView):
 
 
 class PublicTeamCategoryListView(APIView):
-    """GET /api/v1/registrations/team/categories/ — every priced group/
-    relay race (5KM/10KM/21KM Corporate Relay, 100M CEO/Directors, Kids
-    Athletics), each a flat per-group fee regardless of headcount."""
+    """GET /api/v1/registrations/team/categories/ — the same race list
+    Individual entry offers (same Category rows, same per-person price —
+    a group pays that one flat amount for the whole declared headcount,
+    same as create_team_registration always has), plus the one genuinely
+    team-only category: 10KM Corporate Relay, at its own flat K10,000
+    rate regardless of headcount."""
 
     permission_classes = [AllowAny]
 
     def get(self, request):
-        categories = Category.objects.filter(entry_type=Category.EntryType.TEAM, is_active=True)
+        categories = Category.objects.filter(
+            entry_type__in=[Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM],
+            is_active=True,
+        )
         return Response(CategorySerializer(categories, many=True).data)
 
 
@@ -733,7 +739,10 @@ class AdminTeamFilterOptionsView(APIView):
     permission_classes = [IsAuthenticated, IsStaffRole]
 
     def get(self, request):
-        categories = Category.objects.filter(entry_type=Category.EntryType.TEAM, is_active=True)
+        categories = Category.objects.filter(
+            entry_type__in=[Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM],
+            is_active=True,
+        )
         return Response(
             {
                 "categories": CategorySerializer(categories, many=True).data,

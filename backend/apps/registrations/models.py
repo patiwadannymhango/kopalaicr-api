@@ -189,9 +189,12 @@ class TeamRegistration(BaseRegistration):
 
     REFERENCE_PREFIX = "KICRT"
 
+    # A team's race can be any INDIVIDUAL-priced race (the group pays
+    # that one flat per-person price for the whole declared headcount) or
+    # the TEAM-only 10KM Corporate Relay (its own flat K10,000 rate).
     category = models.ForeignKey(
         Category, on_delete=models.PROTECT, related_name="team_registrations",
-        limit_choices_to={"entry_type": Category.EntryType.TEAM},
+        limit_choices_to={"entry_type__in": [Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM]},
     )
     team_name = models.CharField(max_length=200)
     company_or_institution = models.CharField(max_length=200)

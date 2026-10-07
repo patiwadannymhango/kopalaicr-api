@@ -288,7 +288,11 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
 
     def validate_raceCategory(self, value):
         try:
-            return Category.objects.get(code=value, entry_type=Category.EntryType.TEAM, is_active=True)
+            return Category.objects.get(
+                code=value,
+                entry_type__in=[Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM],
+                is_active=True,
+            )
         except Category.DoesNotExist:
             raise serializers.ValidationError("Invalid race category.")
 
