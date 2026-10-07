@@ -125,15 +125,33 @@ def create_team_registration(
     """
     Create the team's base entry registration and its roster in one call.
 
-    `category` is the priced TEAM Category the group is entering (5KM/10KM/
-    21KM Corporate Relay, 100M CEO/Directors, Kids Athletics — all K10,000).
-    Defaults to the original single "relay" (10KM Corporate Relay) category
-    when not given, since the admin's manual "Add team" flow has no race
-    picker of its own yet.
+    `category`, when given, is a single priced Category the whole group
+    pays for — only used by the admin's manual "Add team" flow, which has
+    no per-roster-row race picker of its own yet. The public form instead
+    always leaves `category` None and requires every roster entry to
+    carry its own `raceCategory`; the group's amount is the sum of each
+    entry's own category price (same model as the Individual bulk
+    registration flow — see create_individual_registration_batch). With
+    category=None and an empty roster (only reachable from the admin
+    path), amount defaults to the original single "relay" (10KM
+    Corporate Relay) category.
     """
 
-    if category is None:
+    if category is not None:
+        amount = category.price
+        currency = category.currency
+    elif roster:
+        race_codes = {entry["raceCategory"] for entry in roster if entry.get("raceCategory")}
+        categories_by_code = {c.code: c for c in Category.objects.filter(code__in=race_codes)}
+        amount = sum(
+            (categories_by_code[entry["raceCategory"]].price for entry in roster if entry.get("raceCategory")),
+            Decimal("0.00"),
+        )
+        currency = next(iter(categories_by_code.values())).currency if categories_by_code else "ZMW"
+    else:
         category = Category.objects.get(code="relay", entry_type=Category.EntryType.TEAM, is_active=True)
+        amount = category.price
+        currency = category.currency
 
     team = TeamRegistration.objects.create(
         category=category,
@@ -147,8 +165,8 @@ def create_team_registration(
         participant_count=participant_count,
         free_runner_limit=settings.TEAM_FREE_RUNNER_LIMIT,
         accepted_terms=accepted_terms,
-        amount=category.price,
-        currency=category.currency,
+        amount=amount,
+        currency=currency,
     )
 
     for entry in roster:

@@ -264,11 +264,11 @@ class RunnerRosterEntrySerializer(serializers.Serializer):
     fullName = serializers.CharField(max_length=200)
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
     age = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=120)
-    raceCategory = serializers.CharField(required=False, allow_blank=True, default="")
+    # Required: with no group-wide category left on the public form, this
+    # is the only place a race (and therefore a price) is chosen at all.
+    raceCategory = serializers.CharField()
 
     def validate_raceCategory(self, value):
-        if not value:
-            return value
         if not Category.objects.filter(
             code=value,
             entry_type__in=[Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM],
@@ -281,7 +281,6 @@ class RunnerRosterEntrySerializer(serializers.Serializer):
 class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     teamName = serializers.CharField(max_length=200)
     companyOrInstitution = serializers.CharField(max_length=200)
-    raceCategory = serializers.CharField()
     # "Team Lead" on the public form — optional, so field-level validation
     # is lenient; a blank email/phone just means no confirmation can be
     # sent (notify_* already guards on `if team.captain_email`/`_phone`).
@@ -290,7 +289,10 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     captainEmail = serializers.EmailField(required=False, allow_blank=True, default="")
     captainPhone = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
     participantCount = serializers.IntegerField(min_value=1)
-    roster = RunnerRosterEntrySerializer(many=True, required=False, default=list)
+    # No longer optional: this is where every participant's race (and so
+    # the group's total amount, summed from each entry's own category
+    # price) comes from — see create_team_registration.
+    roster = RunnerRosterEntrySerializer(many=True)
     acceptedTerms = serializers.BooleanField()
 
     def validate_acceptedTerms(self, value):
@@ -298,19 +300,11 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("You must accept the terms and conditions.")
         return value
 
-    def validate_raceCategory(self, value):
-        try:
-            return Category.objects.get(
-                code=value,
-                entry_type__in=[Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM],
-                is_active=True,
-            )
-        except Category.DoesNotExist:
-            raise serializers.ValidationError("Invalid race category.")
-
     def validate_roster(self, value):
         from django.conf import settings
 
+        if not value:
+            raise serializers.ValidationError("Add at least one participant.")
         if len(value) > settings.TEAM_ROSTER_MAX_ROWS:
             raise serializers.ValidationError(
                 f"Add up to {settings.TEAM_ROSTER_MAX_ROWS} entries here."
@@ -320,9 +314,9 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         roster = attrs.get("roster") or []
         participant_count = attrs.get("participantCount")
-        if participant_count is not None and len(roster) > participant_count:
+        if participant_count is not None and len(roster) != participant_count:
             raise serializers.ValidationError(
-                {"roster": "The participant list can't have more entries than the number of participants."}
+                {"roster": "The participant list must have exactly one row per participant."}
             )
         return attrs
 
@@ -331,18 +325,18 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
         return {
             "team_name": data["teamName"],
             "company_or_institution": data["companyOrInstitution"],
-            "category": data["raceCategory"],
-            # The public form only asks which race the group is entering —
-            # the Men's/Women's/Mixed division tag is a separate, admin-only
-            # concept (see TeamRegistration.relay_category) that no longer
-            # has a public input, so every new group defaults to Mixed.
+            # The public form only asks which race each participant is
+            # entering — the Men's/Women's/Mixed division tag is a
+            # separate, admin-only concept (see
+            # TeamRegistration.relay_category) that no longer has a public
+            # input, so every new group defaults to Mixed.
             "relay_category": TeamRegistration.RelayCategory.MIXED_TEAM,
             "captain_first_name": data["captainFirstName"],
             "captain_last_name": data["captainLastName"],
             "captain_email": data["captainEmail"],
             "captain_phone": data["captainPhone"],
             "participant_count": data["participantCount"],
-            "roster": data.get("roster", []),
+            "roster": data["roster"],
             "accepted_terms": data["acceptedTerms"],
         }
 
@@ -442,14 +436,19 @@ def serialize_individual_record(registration):
 def serialize_team_record(team):
     latest_payment = team.payments.order_by("-created_at").first()
 
+    roster = list(team.roster.all())
+    category_name_by_code = dict(
+        Category.objects.filter(
+            code__in={r.race_category for r in roster if r.race_category}
+        ).values_list("code", "name")
+    )
+
     return {
         "reference": team.registration_number,
         "entryType": "team",
         "details": {
             "teamName": team.team_name,
             "companyOrInstitution": team.company_or_institution,
-            "raceCategory": team.category.code,
-            "raceCategoryName": team.category.name,
             "relayCategory": team.relay_category,
             "captainFirstName": team.captain_first_name,
             "captainLastName": team.captain_last_name,
@@ -457,8 +456,14 @@ def serialize_team_record(team):
             "captainPhone": team.captain_phone,
             "participantCount": team.participant_count,
             "roster": [
-                {"fullName": r.full_name, "gender": r.gender, "age": r.age, "raceCategory": r.race_category}
-                for r in team.roster.all()
+                {
+                    "fullName": r.full_name,
+                    "gender": r.gender,
+                    "age": r.age,
+                    "raceCategory": r.race_category,
+                    "raceCategoryName": category_name_by_code.get(r.race_category, r.race_category),
+                }
+                for r in roster
             ],
             "acceptedTerms": team.accepted_terms,
         },
@@ -643,7 +648,13 @@ class AdminRosterRunnerSerializer(serializers.ModelSerializer):
 
 class AdminTeamRegistrationSerializer(serializers.ModelSerializer):
     roster = AdminRosterRunnerSerializer(many=True, read_only=True)
-    category_name = serializers.CharField(source="category.name", read_only=True)
+    # category is nullable now (public submissions no longer set one —
+    # see TeamRegistration.category) — a plain `source="category.name"`
+    # CharField would raise AttributeError on a None category.
+    category_name = serializers.SerializerMethodField()
+
+    def get_category_name(self, obj):
+        return obj.category.name if obj.category else None
 
     class Meta:
         model = TeamRegistration

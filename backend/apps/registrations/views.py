@@ -873,10 +873,16 @@ class AdminTeamExportView(APIView):
         ("Captain name", lambda r: f"{r.captain_first_name} {r.captain_last_name}".strip()),
         ("Captain email", lambda r: r.captain_email),
         ("Captain phone", lambda r: r.captain_phone),
-        ("Category", lambda r: r.category.name),
+        ("Category", lambda r: r.category.name if r.category else ""),
         ("Participants", lambda r: r.participant_count),
         ("Roster size", lambda r: r.roster.count()),
-        ("Roster", lambda r: ", ".join(runner.full_name for runner in r.roster.all())),
+        (
+            "Roster",
+            lambda r: ", ".join(
+                f"{runner.full_name} ({runner.race_category})" if runner.race_category else runner.full_name
+                for runner in r.roster.all()
+            ),
+        ),
         ("Amount", lambda r: float(r.amount)),
         ("Currency", lambda r: r.currency),
         ("Registered at", lambda r: r.registered_at.replace(tzinfo=None) if r.registered_at else None),

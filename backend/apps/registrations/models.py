@@ -189,11 +189,14 @@ class TeamRegistration(BaseRegistration):
 
     REFERENCE_PREFIX = "KICRT"
 
-    # A team's race can be any INDIVIDUAL-priced race (the group pays
-    # that one flat per-person price for the whole declared headcount) or
-    # the TEAM-only 10KM Corporate Relay (its own flat K10,000 rate).
+    # Nullable: the public form no longer has one group-wide race — each
+    # roster entry (below) picks its own, and the group's amount is the
+    # sum of each entry's own category price. Stays set (and still drives
+    # `amount` directly) only for the admin's manual "Add team" flow,
+    # which has no per-roster-row race picker of its own yet.
     category = models.ForeignKey(
         Category, on_delete=models.PROTECT, related_name="team_registrations",
+        null=True, blank=True,
         limit_choices_to={"entry_type__in": [Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM]},
     )
     team_name = models.CharField(max_length=200)

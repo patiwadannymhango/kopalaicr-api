@@ -231,7 +231,7 @@ def notify_team_registration_received(team):
     text = (
         f"Hi {team.captain_first_name},\n\n"
         f"We've received {team.team_name}'s registration for {settings.EVENT_NAME}.\n"
-        f"Category: 10KM Corporate Relay\n"
+        f"Participants: {team.participant_count}\n"
         f"Amount due: {team.currency} {team.amount}\n\n"
         "Complete payment to confirm your team's place and receive your registration reference. "
         "Your team login is already set up — sign in anytime to manage your roster.\n"
