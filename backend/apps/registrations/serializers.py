@@ -263,7 +263,7 @@ class RunnerRosterEntrySerializer(serializers.Serializer):
 
     fullName = serializers.CharField(max_length=200)
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
-    age = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=120)
+    ageRange = serializers.ChoiceField(choices=Participant.AgeRange.choices, required=False, allow_blank=True)
     # Required: with no group-wide category left on the public form, this
     # is the only place a race (and therefore a price) is chosen at all.
     raceCategory = serializers.CharField()
@@ -459,7 +459,7 @@ def serialize_team_record(team):
                 {
                     "fullName": r.full_name,
                     "gender": r.gender,
-                    "age": r.age,
+                    "ageRange": r.age_range,
                     "raceCategory": r.race_category,
                     "raceCategoryName": category_name_by_code.get(r.race_category, r.race_category),
                 }
@@ -643,7 +643,7 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
 class AdminRosterRunnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = RosterRunner
-        fields = ("id", "full_name", "gender", "age", "race_category")
+        fields = ("id", "full_name", "gender", "age_range", "race_category")
 
 
 class AdminTeamRegistrationSerializer(serializers.ModelSerializer):

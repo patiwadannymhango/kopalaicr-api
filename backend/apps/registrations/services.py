@@ -174,7 +174,7 @@ def create_team_registration(
             team_registration=team,
             full_name=entry["fullName"],
             gender=entry.get("gender", ""),
-            age=entry.get("age"),
+            age_range=entry.get("ageRange", ""),
             race_category=entry.get("raceCategory", ""),
         )
 

@@ -275,7 +275,7 @@ class RosterRunner(UUIDModel):
     team_registration = models.ForeignKey(TeamRegistration, on_delete=models.CASCADE, related_name="roster")
     full_name = models.CharField(max_length=200)
     gender = models.CharField(max_length=10, choices=Participant.Gender.choices, blank=True)
-    age = models.PositiveIntegerField(null=True, blank=True)
+    age_range = models.CharField(max_length=20, choices=Participant.AgeRange.choices, blank=True)
     # Which race this person runs — informational only, independent of
     # TeamRegistration.category (which drives the group's one flat fee).
     # A Category *code*, not an FK: this is descriptive roster detail,
