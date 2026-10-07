@@ -263,6 +263,7 @@ class RunnerRosterEntrySerializer(serializers.Serializer):
 
     fullName = serializers.CharField(max_length=200)
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
+    age = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=120)
 
 
 class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
@@ -291,11 +292,20 @@ class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
     def validate_roster(self, value):
         from django.conf import settings
 
-        if len(value) > settings.TEAM_FREE_RUNNER_LIMIT:
+        if len(value) > settings.TEAM_ROSTER_MAX_ROWS:
             raise serializers.ValidationError(
-                f"Add up to {settings.TEAM_FREE_RUNNER_LIMIT} runners here."
+                f"Add up to {settings.TEAM_ROSTER_MAX_ROWS} entries here."
             )
         return value
+
+    def validate(self, attrs):
+        roster = attrs.get("roster") or []
+        participant_count = attrs.get("participantCount")
+        if participant_count is not None and len(roster) > participant_count:
+            raise serializers.ValidationError(
+                {"roster": "The participant list can't have more entries than the number of participants."}
+            )
+        return attrs
 
     def to_registration_kwargs(self):
         data = self.validated_data
@@ -427,7 +437,7 @@ def serialize_team_record(team):
             "captainEmail": team.captain_email,
             "captainPhone": team.captain_phone,
             "participantCount": team.participant_count,
-            "roster": [{"fullName": r.full_name, "gender": r.gender} for r in team.roster.all()],
+            "roster": [{"fullName": r.full_name, "gender": r.gender, "age": r.age} for r in team.roster.all()],
             "acceptedTerms": team.accepted_terms,
         },
         "payment": _payment_info(latest_payment),
@@ -606,7 +616,7 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
 class AdminRosterRunnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = RosterRunner
-        fields = ("id", "full_name", "gender")
+        fields = ("id", "full_name", "gender", "age")
 
 
 class AdminTeamRegistrationSerializer(serializers.ModelSerializer):

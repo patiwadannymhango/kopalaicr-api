@@ -254,17 +254,19 @@ class TeamRegistration(BaseRegistration):
 
 class RosterRunner(UUIDModel):
     """
-    One runner on a team's roster, submitted at registration time (up to
-    team.free_runner_limit — enforced in the serializer). Plain roster
-    entry, not a payment target — there's no self-service way to add more
-    after registration (that required the now-removed captain login); an
-    admin edits the roster inline on the TeamRegistration in
-    /django-admin/ if it ever needs to change.
+    One named participant on a team's optional roster, submitted at
+    registration time (capped against the team's own participant_count
+    and settings.TEAM_ROSTER_MAX_ROWS — enforced in the serializer).
+    Plain roster entry, not a payment target — there's no self-service
+    way to add more after registration (that required the now-removed
+    captain login); an admin edits the roster inline on the
+    TeamRegistration in /django-admin/ if it ever needs to change.
     """
 
     team_registration = models.ForeignKey(TeamRegistration, on_delete=models.CASCADE, related_name="roster")
     full_name = models.CharField(max_length=200)
     gender = models.CharField(max_length=10, choices=Participant.Gender.choices, blank=True)
+    age = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["created_at"]

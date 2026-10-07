@@ -298,3 +298,9 @@ TEAM_FREE_RUNNER_LIMIT = config("TEAM_FREE_RUNNER_LIMIT", default=8, cast=int)
 # PENDING_PAYMENT rows — this is the worst-case capacity a single
 # abandoned/bad-faith batch submission can squat.
 INDIVIDUAL_BATCH_MAX_ROWS = config("INDIVIDUAL_BATCH_MAX_ROWS", default=50, cast=int)
+
+# Absolute ceiling on a team's optional named-participant list, independent
+# of whatever participantCount claims (which the serializer also checks the
+# roster against) — a second, cheap line of defense against one request
+# writing an unbounded number of RosterRunner rows.
+TEAM_ROSTER_MAX_ROWS = config("TEAM_ROSTER_MAX_ROWS", default=100, cast=int)

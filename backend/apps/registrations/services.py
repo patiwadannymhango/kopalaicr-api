@@ -151,11 +151,12 @@ def create_team_registration(
         currency=category.currency,
     )
 
-    for entry in roster[: settings.TEAM_FREE_RUNNER_LIMIT]:
+    for entry in roster:
         RosterRunner.objects.create(
             team_registration=team,
             full_name=entry["fullName"],
             gender=entry.get("gender", ""),
+            age=entry.get("age"),
         )
 
     team.notify_received()
