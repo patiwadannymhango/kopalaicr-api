@@ -273,6 +273,11 @@ class RosterRunner(UUIDModel):
     full_name = models.CharField(max_length=200)
     gender = models.CharField(max_length=10, choices=Participant.Gender.choices, blank=True)
     age = models.PositiveIntegerField(null=True, blank=True)
+    # Which race this person runs — informational only, independent of
+    # TeamRegistration.category (which drives the group's one flat fee).
+    # A Category *code*, not an FK: this is descriptive roster detail,
+    # not a payment target, matching gender/age's plain-field treatment.
+    race_category = models.CharField(max_length=100, blank=True)
 
     class Meta:
         ordering = ["created_at"]

@@ -157,6 +157,7 @@ def create_team_registration(
             full_name=entry["fullName"],
             gender=entry.get("gender", ""),
             age=entry.get("age"),
+            race_category=entry.get("raceCategory", ""),
         )
 
     team.notify_received()

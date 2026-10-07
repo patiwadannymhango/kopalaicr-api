@@ -264,6 +264,18 @@ class RunnerRosterEntrySerializer(serializers.Serializer):
     fullName = serializers.CharField(max_length=200)
     gender = serializers.ChoiceField(choices=Participant.Gender.choices, required=False, allow_blank=True)
     age = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=120)
+    raceCategory = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate_raceCategory(self, value):
+        if not value:
+            return value
+        if not Category.objects.filter(
+            code=value,
+            entry_type__in=[Category.EntryType.INDIVIDUAL, Category.EntryType.TEAM],
+            is_active=True,
+        ).exists():
+            raise serializers.ValidationError("Invalid race category.")
+        return value
 
 
 class PublicTeamRegistrationCreateSerializer(serializers.Serializer):
@@ -444,7 +456,10 @@ def serialize_team_record(team):
             "captainEmail": team.captain_email,
             "captainPhone": team.captain_phone,
             "participantCount": team.participant_count,
-            "roster": [{"fullName": r.full_name, "gender": r.gender, "age": r.age} for r in team.roster.all()],
+            "roster": [
+                {"fullName": r.full_name, "gender": r.gender, "age": r.age, "raceCategory": r.race_category}
+                for r in team.roster.all()
+            ],
             "acceptedTerms": team.accepted_terms,
         },
         "payment": _payment_info(latest_payment),
@@ -623,7 +638,7 @@ class AdminManualIndividualRegistrationSerializer(serializers.Serializer):
 class AdminRosterRunnerSerializer(serializers.ModelSerializer):
     class Meta:
         model = RosterRunner
-        fields = ("id", "full_name", "gender", "age")
+        fields = ("id", "full_name", "gender", "age", "race_category")
 
 
 class AdminTeamRegistrationSerializer(serializers.ModelSerializer):
